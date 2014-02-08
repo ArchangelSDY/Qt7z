@@ -50,7 +50,7 @@ void TestQt7zPackage::getFileNameList_data()
 
     QTest::newRow("text.7z")
         << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
-        << (QStringList() << "1.txt" << "2.txt");
+        << (QStringList() << "1.txt" << "2.txt" << "sub/1.txt");
 }
 
 void TestQt7zPackage::extractFile_text()
@@ -82,6 +82,10 @@ void TestQt7zPackage::extractFile_text_data()
         << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
         << QString("2.txt")
         << QString("I am two.\n");
+    QTest::newRow("text.7z/sub/1.txt")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
+        << QString("sub/1.txt")
+        << QString("I am one.\n");
 }
 
 void TestQt7zPackage::extractFile_image()
