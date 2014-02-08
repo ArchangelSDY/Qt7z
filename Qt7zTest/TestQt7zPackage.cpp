@@ -1,4 +1,5 @@
 #include <QDir>
+#include <QDebug>
 #include <QStringList>
 #include <QTest>
 
@@ -49,4 +50,35 @@ void TestQt7zPackage::getFileNameList_data()
     QTest::newRow("test1.7z")
         << qApp->applicationDirPath() + QDir::separator() + "assets/test1.7z"
         << (QStringList() << "1.txt" << "2.txt");
+}
+
+void TestQt7zPackage::extractFile()
+{
+    QFETCH(QString, packagePath);
+    QFETCH(QString, fileName);
+    QFETCH(QString, fileContent);
+
+    Qt7zPackage pkg(packagePath);
+    QBuffer buf;
+    buf.open(QIODevice::ReadWrite);
+
+    QVERIFY(pkg.extractFile(fileName, &buf));
+    QString actualFileContent(buf.buffer());
+    QCOMPARE(actualFileContent, fileContent);
+}
+
+void TestQt7zPackage::extractFile_data()
+{
+    QTest::addColumn<QString>("packagePath");
+    QTest::addColumn<QString>("fileName");
+    QTest::addColumn<QString>("fileContent");
+
+    QTest::newRow("test1.7z")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/test1.7z"
+        << QString("1.txt")
+        << QString("I am one.\n");
+    QTest::newRow("test1.7z")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/test1.7z"
+        << QString("2.txt")
+        << QString("I am two.\n");
 }

@@ -11,6 +11,8 @@ private slots:
     void openAndClose_data();
     void getFileNameList();
     void getFileNameList_data();
+    void extractFile();
+    void extractFile_data();
 };
 
 #endif // TESTQT7ZPACKAGE_H
