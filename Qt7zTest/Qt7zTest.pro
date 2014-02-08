@@ -6,8 +6,6 @@
 
 QT       += testlib
 
-QT       -= gui
-
 TARGET = Qt7zTest
 CONFIG   += console
 CONFIG   -= app_bundle
