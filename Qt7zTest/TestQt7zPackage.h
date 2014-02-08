@@ -7,8 +7,8 @@ class TestQt7zPackage : public QObject
 {
     Q_OBJECT
 private slots:
-    void open();
-    void open_data();
+    void openAndClose();
+    void openAndClose_data();
     void getFileNameList();
     void getFileNameList_data();
 };

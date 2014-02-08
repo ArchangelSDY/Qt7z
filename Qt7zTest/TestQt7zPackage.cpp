@@ -6,15 +6,18 @@
 
 #include "TestQt7zPackage.h"
 
-void TestQt7zPackage::open()
+void TestQt7zPackage::openAndClose()
 {
     QFETCH(QString, packagePath);
 
     Qt7zPackage pkg(packagePath);
     QVERIFY(pkg.open());
+    QVERIFY(pkg.isOpen());
+    pkg.close();
+    QVERIFY(!pkg.isOpen());
 }
 
-void TestQt7zPackage::open_data()
+void TestQt7zPackage::openAndClose_data()
 {
     QTest::addColumn<QString>("packagePath");
 

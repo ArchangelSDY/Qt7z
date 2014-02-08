@@ -1,9 +1,3 @@
-#include "7z.h"
-#include "7zAlloc.h"
-#include "7zCrc.h"
-#include "7zFile.h"
-#include "7zVersion.h"
-
 #include "Qt7zPackage.h"
 
 #include <QDebug>
@@ -12,6 +6,11 @@ Qt7zPackage::Qt7zPackage(const QString &packagePath) :
     m_packagePath(packagePath) ,
     m_isOpen(false)
 {
+    m_allocImp.Alloc = SzAlloc;
+    m_allocImp.Free = SzFree;
+
+    m_allocTempImp.Alloc = SzAllocTemp;
+    m_allocTempImp.Free = SzFreeTemp;
 }
 
 void Qt7zPackage::reset()
@@ -23,45 +22,34 @@ void Qt7zPackage::reset()
 
 bool Qt7zPackage::open()
 {
-    CFileInStream archiveStream;
-    CLookToRead lookStream;
-    CSzArEx db;
+    if (m_isOpen) {
+        return false;
+    }
+
     SRes res;
-    ISzAlloc allocImp;
-    ISzAlloc allocTempImp;
     UInt16 *temp = NULL;
     size_t tempSize = 0;
 
-    allocImp.Alloc = SzAlloc;
-    allocImp.Free = SzFree;
-
-    allocTempImp.Alloc = SzAllocTemp;
-    allocTempImp.Free = SzFreeTemp;
-
-    if (InFile_Open(&archiveStream.file, m_packagePath.toUtf8().data())) {
+    if (InFile_Open(&m_archiveStream.file, m_packagePath.toUtf8().data())) {
         qDebug() << "Can not open file: " << m_packagePath;
         m_isOpen = false;
         return false;
     }
 
-    FileInStream_CreateVTable(&archiveStream);
-    LookToRead_CreateVTable(&lookStream, False);
+    FileInStream_CreateVTable(&m_archiveStream);
+    LookToRead_CreateVTable(&m_lookStream, False);
     
-    lookStream.realStream = &archiveStream.s;
-    LookToRead_Init(&lookStream);
+    m_lookStream.realStream = &m_archiveStream.s;
+    LookToRead_Init(&m_lookStream);
 
     CrcGenerateTable();
 
-    SzArEx_Init(&db);
-    res = SzArEx_Open(&db, &lookStream.s, &allocImp, &allocTempImp);
+    SzArEx_Init(&m_db);
+    res = SzArEx_Open(&m_db, &m_lookStream.s, &m_allocImp, &m_allocTempImp);
 
     if (res == SZ_OK) {
-        UInt32 i;
-
-        for (i = 0; i < db.db.NumFiles; i++) {
-            size_t len;
-
-            len = SzArEx_GetFileNameUtf16(&db, i, NULL);
+        for (UInt32 i = 0; i < m_db.db.NumFiles; i++) {
+            size_t len = SzArEx_GetFileNameUtf16(&m_db, i, NULL);
 
             if (len > tempSize) {
                 SzFree(NULL, temp);
@@ -73,7 +61,7 @@ bool Qt7zPackage::open()
                 }
             }
 
-            SzArEx_GetFileNameUtf16(&db, i, temp);
+            SzArEx_GetFileNameUtf16(&m_db, i, temp);
 
             // TODO: Codec?
             QString fileName = QString::fromUtf16(temp);
@@ -81,17 +69,12 @@ bool Qt7zPackage::open()
 
             if (res != SZ_OK)
                 break;
-            continue;
         }
     }
 
-    // TODO: should close in close().
-    SzArEx_Free(&db, &allocImp);
     SzFree(NULL, temp);
 
-    File_Close(&archiveStream.file);
     if (res == SZ_OK) {
-        // Everything is OK
         m_isOpen = true;
         return true;
     } else {
@@ -102,7 +85,9 @@ bool Qt7zPackage::open()
 
 void Qt7zPackage::close()
 {
-
+    SzArEx_Free(&m_db, &m_allocImp);
+    File_Close(&m_archiveStream.file);
+    m_isOpen = false;
 }
 
 bool Qt7zPackage::isOpen() const
