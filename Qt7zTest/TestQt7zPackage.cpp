@@ -22,8 +22,8 @@ void TestQt7zPackage::openAndClose_data()
 {
     QTest::addColumn<QString>("packagePath");
 
-    QTest::newRow("test1.7z")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/test1.7z";
+    QTest::newRow("text.7z")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z";
 }
 
 void TestQt7zPackage::getFileNameList()
@@ -47,8 +47,8 @@ void TestQt7zPackage::getFileNameList_data()
     QTest::addColumn<QString>("packagePath");
     QTest::addColumn<QStringList>("expectFileNameList");
 
-    QTest::newRow("test1.7z")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/test1.7z"
+    QTest::newRow("text.7z")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
         << (QStringList() << "1.txt" << "2.txt");
 }
 
@@ -73,12 +73,12 @@ void TestQt7zPackage::extractFile_data()
     QTest::addColumn<QString>("fileName");
     QTest::addColumn<QString>("fileContent");
 
-    QTest::newRow("test1.7z")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/test1.7z"
+    QTest::newRow("text.7z")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
         << QString("1.txt")
         << QString("I am one.\n");
-    QTest::newRow("test1.7z")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/test1.7z"
+    QTest::newRow("text.7z")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
         << QString("2.txt")
         << QString("I am two.\n");
 }
