@@ -128,4 +128,9 @@ void TestQt7zPackage::extractFile_image_data()
         << QString("yellow.png")
         << 800
         << 800;
+    QTest::newRow("encoding")
+        << qApp->applicationDirPath() + QDir::separator() + "assets/image.7z"
+        << QString("[rootnuko＋H] てにおはっ！ ～女の子だってホントはえっちだよ？～/red.jpg")
+        << 225
+        << 225;
 }
