@@ -57,6 +57,7 @@ Qt7zPackage::Qt7zPackage(const QString &packagePath) :
 
 Qt7zPackage::~Qt7zPackage()
 {
+    close();
     delete m_p;
 }
 
@@ -141,9 +142,11 @@ bool Qt7zPackage::open()
 
 void Qt7zPackage::close()
 {
-    SzArEx_Free(&(m_p->m_db), &(m_p->m_allocImp));
-    File_Close(&(m_p->m_archiveStream.file));
-    m_isOpen = false;
+    if (m_isOpen) {
+        SzArEx_Free(&(m_p->m_db), &(m_p->m_allocImp));
+        File_Close(&(m_p->m_archiveStream.file));
+        m_isOpen = false;
+    }
 }
 
 bool Qt7zPackage::isOpen() const
