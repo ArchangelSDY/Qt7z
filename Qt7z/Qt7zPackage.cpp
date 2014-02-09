@@ -1,26 +1,63 @@
+#include "7z.h"
+#include "7zAlloc.h"
+#include "7zCrc.h"
+#include "7zFile.h"
+#include "7zVersion.h"
+
 #include "Qt7zPackage.h"
 
 #include <QDebug>
 
-Qt7zPackage::Qt7zPackage(const QString &packagePath) :
-    m_packagePath(packagePath) ,
-    m_isOpen(false) ,
-    m_blockIndex(0xFFFFFFFF) ,
-    m_outBuffer(0) ,
-    m_outBufferSize(0)
+class Qt7zPackagePrivate
 {
-    m_allocImp.Alloc = SzAlloc;
-    m_allocImp.Free = SzFree;
+    friend class Qt7zPackage;
+public:
+    Qt7zPackagePrivate(Qt7zPackage *q) :
+        m_q(q) ,
+        m_blockIndex(0xFFFFFFFF) ,
+        m_outBuffer(0) ,
+        m_outBufferSize(0)
+    {
+        m_allocImp.Alloc = SzAlloc;
+        m_allocImp.Free = SzFree;
 
-    m_allocTempImp.Alloc = SzAllocTemp;
-    m_allocTempImp.Free = SzFreeTemp;
+        m_allocTempImp.Alloc = SzAllocTemp;
+        m_allocTempImp.Free = SzFreeTemp;
+    }
+
+    ~Qt7zPackagePrivate()
+    {
+        if (m_outBuffer) {
+            SzFree(0, m_outBuffer);
+        }
+    }
+
+private:
+    Qt7zPackage *m_q;
+
+    // For 7z
+    CFileInStream m_archiveStream;
+    CLookToRead m_lookStream;
+    CSzArEx m_db;
+    ISzAlloc m_allocImp;
+    ISzAlloc m_allocTempImp;
+
+    UInt32 m_blockIndex;
+    Byte *m_outBuffer;
+    size_t m_outBufferSize;
+};
+
+Qt7zPackage::Qt7zPackage(const QString &packagePath) :
+    m_p(new Qt7zPackagePrivate(this)) ,
+    m_packagePath(packagePath) ,
+    m_isOpen(false)
+
+{
 }
 
 Qt7zPackage::~Qt7zPackage()
 {
-    if (m_outBuffer) {
-        SzFree(0, m_outBuffer);
-    }
+    delete m_p;
 }
 
 void Qt7zPackage::reset()
@@ -29,12 +66,12 @@ void Qt7zPackage::reset()
     m_isOpen = false;
     m_fileNameList.clear();
 
-    m_blockIndex = 0xFFFFFFFF;
-    if (m_outBuffer) {
-        SzFree(0, m_outBuffer);
-        m_outBuffer = 0;
+    m_p->m_blockIndex = 0xFFFFFFFF;
+    if (m_p->m_outBuffer) {
+        SzFree(0, m_p->m_outBuffer);
+        m_p->m_outBuffer = 0;
     }
-    m_outBufferSize = 0;
+    m_p->m_outBufferSize = 0;
 }
 
 bool Qt7zPackage::open()
@@ -47,26 +84,28 @@ bool Qt7zPackage::open()
     UInt16 *temp = NULL;
     size_t tempSize = 0;
 
-    if (InFile_Open(&m_archiveStream.file, m_packagePath.toUtf8().data())) {
+    if (InFile_Open(&(m_p->m_archiveStream.file),
+                    m_packagePath.toUtf8().data())) {
         qDebug() << "Can not open file: " << m_packagePath;
         m_isOpen = false;
         return false;
     }
 
-    FileInStream_CreateVTable(&m_archiveStream);
-    LookToRead_CreateVTable(&m_lookStream, False);
+    FileInStream_CreateVTable(&(m_p->m_archiveStream));
+    LookToRead_CreateVTable(&(m_p->m_lookStream), False);
     
-    m_lookStream.realStream = &m_archiveStream.s;
-    LookToRead_Init(&m_lookStream);
+    m_p->m_lookStream.realStream = &(m_p->m_archiveStream.s);
+    LookToRead_Init(&(m_p->m_lookStream));
 
     CrcGenerateTable();
 
-    SzArEx_Init(&m_db);
-    res = SzArEx_Open(&m_db, &m_lookStream.s, &m_allocImp, &m_allocTempImp);
+    SzArEx_Init(&(m_p->m_db));
+    res = SzArEx_Open(&(m_p->m_db), &(m_p->m_lookStream.s),
+                      &(m_p->m_allocImp), &(m_p->m_allocTempImp));
 
     if (res == SZ_OK) {
-        for (UInt32 i = 0; i < m_db.db.NumFiles; i++) {
-            size_t len = SzArEx_GetFileNameUtf16(&m_db, i, NULL);
+        for (UInt32 i = 0; i < m_p->m_db.db.NumFiles; i++) {
+            size_t len = SzArEx_GetFileNameUtf16(&(m_p->m_db), i, NULL);
 
             if (len > tempSize) {
                 SzFree(NULL, temp);
@@ -78,7 +117,7 @@ bool Qt7zPackage::open()
                 }
             }
 
-            SzArEx_GetFileNameUtf16(&m_db, i, temp);
+            SzArEx_GetFileNameUtf16(&(m_p->m_db), i, temp);
 
             // TODO: Codec?
             QString fileName = QString::fromUtf16(temp);
@@ -102,8 +141,8 @@ bool Qt7zPackage::open()
 
 void Qt7zPackage::close()
 {
-    SzArEx_Free(&m_db, &m_allocImp);
-    File_Close(&m_archiveStream.file);
+    SzArEx_Free(&(m_p->m_db), &(m_p->m_allocImp));
+    File_Close(&(m_p->m_archiveStream.file));
     m_isOpen = false;
 }
 
@@ -141,16 +180,16 @@ bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
     size_t outSizeProcessed = 0;
 
     SRes res;
-    res = SzArEx_Extract(&m_db, &m_lookStream.s, index,
-        &m_blockIndex, &m_outBuffer, &m_outBufferSize,
-        &offset, &outSizeProcessed, &m_allocImp, &m_allocTempImp);
+    res = SzArEx_Extract(&(m_p->m_db), &(m_p->m_lookStream.s), index,
+        &(m_p->m_blockIndex), &(m_p->m_outBuffer), &(m_p->m_outBufferSize),
+        &offset, &outSizeProcessed, &(m_p->m_allocImp), &(m_p->m_allocTempImp));
     if (res != SZ_OK) {
         qDebug() << "Fail to extract" << name;
         return false;
     }
 
     qint64 writtenSize = outStream->write(
-        reinterpret_cast<const char *>(m_outBuffer + offset),
+        reinterpret_cast<const char *>(m_p->m_outBuffer + offset),
         outSizeProcessed);
     if (static_cast<size_t>(writtenSize) != outSizeProcessed) {
         qDebug() << "Fail to write all extracted data!";
