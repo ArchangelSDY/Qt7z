@@ -47,6 +47,12 @@ private:
     size_t m_outBufferSize;
 };
 
+Qt7zPackage::Qt7zPackage() :
+    m_p(new Qt7zPackagePrivate(this)) ,
+    m_isOpen(false)
+{
+}
+
 Qt7zPackage::Qt7zPackage(const QString &packagePath) :
     m_p(new Qt7zPackagePrivate(this)) ,
     m_packagePath(packagePath) ,

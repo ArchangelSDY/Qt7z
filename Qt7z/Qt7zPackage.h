@@ -11,6 +11,7 @@ class Qt7zPackage
 {
     friend class Qt7zPackagePrivate;
 public:
+    Qt7zPackage();
     Qt7zPackage(const QString &packagePath);
     ~Qt7zPackage();
 
