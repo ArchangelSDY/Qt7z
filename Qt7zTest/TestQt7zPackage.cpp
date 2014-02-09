@@ -11,10 +11,11 @@
 void TestQt7zPackage::openAndClose()
 {
     QFETCH(QString, packagePath);
+    QFETCH(bool, valid);
 
     Qt7zPackage pkg(packagePath);
-    QVERIFY(pkg.open());
-    QVERIFY(pkg.isOpen());
+    QCOMPARE(pkg.open(), valid);
+    QCOMPARE(pkg.isOpen(), valid);
     pkg.close();
     QVERIFY(!pkg.isOpen());
 }
@@ -22,9 +23,14 @@ void TestQt7zPackage::openAndClose()
 void TestQt7zPackage::openAndClose_data()
 {
     QTest::addColumn<QString>("packagePath");
+    QTest::addColumn<bool>("valid");
 
     QTest::newRow("text.7z")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z";
+        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
+        << true;
+    QTest::newRow("file not exists")
+        << "foo"
+        << false;
 }
 
 void TestQt7zPackage::getFileNameList()
