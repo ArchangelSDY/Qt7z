@@ -28,7 +28,8 @@ public:
     ~Qt7zPackagePrivate()
     {
         if (m_outBuffer) {
-            SzFree(0, m_outBuffer);
+            IAlloc_Free(&m_allocImp, m_outBuffer);
+            m_outBuffer = 0;
         }
     }
 
@@ -75,10 +76,9 @@ void Qt7zPackage::reset()
 
     m_p->m_blockIndex = 0xFFFFFFFF;
     if (m_p->m_outBuffer) {
-        SzFree(0, m_p->m_outBuffer);
-        m_p->m_outBuffer = 0;
+        IAlloc_Free(&(m_p->m_allocImp), m_p->m_outBuffer);
+        m_p->m_outBufferSize = 0;
     }
-    m_p->m_outBufferSize = 0;
 }
 
 bool Qt7zPackage::open()
