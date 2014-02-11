@@ -23,9 +23,6 @@ HEADERS += \
     TestQt7zPackage.h
 
 assets.files = $$PWD/assets/*
+assets.path = $$OUT_PWD/assets
 
-macx {
-    assets.path = $$OUT_PWD/assets
-
-    INSTALLS += assets
-}
+INSTALLS += assets
