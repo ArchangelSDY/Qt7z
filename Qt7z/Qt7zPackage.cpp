@@ -65,7 +65,9 @@ Qt7zPackage::Qt7zPackage(const QString &packagePath) :
 Qt7zPackage::~Qt7zPackage()
 {
     close();
-    delete m_p;
+    if (m_p) {
+        delete m_p;
+    }
 }
 
 void Qt7zPackage::reset()
