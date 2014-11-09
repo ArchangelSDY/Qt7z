@@ -10,7 +10,7 @@ file(GLOB PUBLIC_HEADERS "*.h")
 qt_wrap_cpp(MOC_SRCS ${PUBLIC_HEADERS})
 set(SRCS ${SRCS} ${MOC_SRCS})
 
-add_library(qt7z SHARED ${SRCS})
+add_library(qt7z ${SRCS})
 set_target_properties(qt7z PROPERTIES VERSION 1.0.0 SOVERSION 1)
 # target_link_libraries(qt7z ${QT_QTMAIN_LIBRARY} ${QT_QTCORE_LIBRARY})
 target_link_libraries(qt7z Qt5::Core)
