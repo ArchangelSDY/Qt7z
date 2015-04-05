@@ -1,19 +1,66 @@
 #include <QDir>
-#include <QDebug>
 #include <QImage>
+#include <QScopedPointer>
 #include <QStringList>
+#include <QTemporaryFile>
 #include <QTest>
 
 #include "../Qt7z/Qt7zPackage.h"
 
-#include "TestQt7zPackage.h"
+class TestQt7zPackage : public QObject
+{
+    Q_OBJECT
+private slots:
+    void initTestCase();
+
+    void openAndClose();
+    void openAndClose_data();
+    void getFileNameList();
+    void getFileNameList_data();
+    void extractFile_text();
+    void extractFile_text_data();
+    void extractFile_image();
+    void extractFile_image_data();
+
+private:
+    QFile *extractResource(const QString &path);
+};
+
+void TestQt7zPackage::initTestCase()
+{
+    Q_INIT_RESOURCE(Qt7zTest);
+}
+
+QFile *TestQt7zPackage::extractResource(const QString &path)
+{
+    QFile r(path);
+    if (!r.open(QIODevice::ReadOnly)) {
+        return 0;
+    }
+
+    QTemporaryFile *f = new QTemporaryFile();
+    if (!f->open()) {
+        delete f;
+        return 0;
+    }
+
+    f->write(r.readAll());
+    f->close();
+
+    return f;
+}
 
 void TestQt7zPackage::openAndClose()
 {
-    QFETCH(QString, packagePath);
+    QFETCH(QString, rcPkgPath);
     QFETCH(bool, valid);
 
-    Qt7zPackage pkg(packagePath);
+    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
+    QString localPkgPath = localPkg.isNull()
+        ? rcPkgPath
+        : localPkg->fileName();
+
+    Qt7zPackage pkg(localPkgPath);
     QCOMPARE(pkg.open(), valid);
     QCOMPARE(pkg.isOpen(), valid);
     pkg.close();
@@ -22,11 +69,11 @@ void TestQt7zPackage::openAndClose()
 
 void TestQt7zPackage::openAndClose_data()
 {
-    QTest::addColumn<QString>("packagePath");
+    QTest::addColumn<QString>("rcPkgPath");
     QTest::addColumn<bool>("valid");
 
     QTest::newRow("text.7z")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
+        << ":/assets/text.7z"
         << true;
     QTest::newRow("file not exists")
         << "foo"
@@ -35,10 +82,16 @@ void TestQt7zPackage::openAndClose_data()
 
 void TestQt7zPackage::getFileNameList()
 {
-    QFETCH(QString, packagePath);
+    QFETCH(QString, rcPkgPath);
     QFETCH(QStringList, expectFileNameList);
 
-    Qt7zPackage pkg(packagePath);
+    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
+    QString localPkgPath = localPkg.isNull()
+        ? rcPkgPath
+        : localPkg->fileName();
+
+    Qt7zPackage pkg(localPkgPath);
+
     QVERIFY(pkg.open());
 
     const QStringList &actualFileNameList = pkg.getFileNameList();
@@ -51,21 +104,27 @@ void TestQt7zPackage::getFileNameList()
 
 void TestQt7zPackage::getFileNameList_data()
 {
-    QTest::addColumn<QString>("packagePath");
+    QTest::addColumn<QString>("rcPkgPath");
     QTest::addColumn<QStringList>("expectFileNameList");
 
     QTest::newRow("text.7z")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
+        << ":/assets/text.7z"
         << (QStringList() << "1.txt" << "2.txt" << "sub/1.txt");
 }
 
 void TestQt7zPackage::extractFile_text()
 {
-    QFETCH(QString, packagePath);
+    QFETCH(QString, rcPkgPath);
     QFETCH(QString, fileName);
     QFETCH(QString, fileContent);
 
-    Qt7zPackage pkg(packagePath);
+    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
+    QString localPkgPath = localPkg.isNull()
+        ? rcPkgPath
+        : localPkg->fileName();
+
+    Qt7zPackage pkg(localPkgPath);
+
     QBuffer buf;
     buf.open(QIODevice::ReadWrite);
 
@@ -76,32 +135,38 @@ void TestQt7zPackage::extractFile_text()
 
 void TestQt7zPackage::extractFile_text_data()
 {
-    QTest::addColumn<QString>("packagePath");
+    QTest::addColumn<QString>("rcPkgPath");
     QTest::addColumn<QString>("fileName");
     QTest::addColumn<QString>("fileContent");
 
     QTest::newRow("text.7z/1.txt")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
+        << ":/assets/text.7z"
         << QString("1.txt")
         << QString("I am one.\n");
     QTest::newRow("text.7z/2.txt")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
+        << ":/assets/text.7z"
         << QString("2.txt")
         << QString("I am two.\n");
     QTest::newRow("text.7z/sub/1.txt")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/text.7z"
+        << ":/assets/text.7z"
         << QString("sub/1.txt")
         << QString("I am one.\n");
 }
 
 void TestQt7zPackage::extractFile_image()
 {
-    QFETCH(QString, packagePath);
+    QFETCH(QString, rcPkgPath);
     QFETCH(QString, fileName);
     QFETCH(int, width);
     QFETCH(int, height);
 
-    Qt7zPackage pkg(packagePath);
+    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
+    QString localPkgPath = localPkg.isNull()
+        ? rcPkgPath
+        : localPkg->fileName();
+
+    Qt7zPackage pkg(localPkgPath);
+
     QBuffer buf;
     buf.open(QIODevice::ReadWrite);
 
@@ -113,24 +178,27 @@ void TestQt7zPackage::extractFile_image()
 
 void TestQt7zPackage::extractFile_image_data()
 {
-    QTest::addColumn<QString>("packagePath");
+    QTest::addColumn<QString>("rcPkgPath");
     QTest::addColumn<QString>("fileName");
     QTest::addColumn<int>("width");
     QTest::addColumn<int>("height");
 
     QTest::newRow("image.7z/red.jpg")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/image.7z"
+        << ":/assets/image.7z"
         << QString("red.jpg")
         << 225
         << 225;
     QTest::newRow("image.7z/yellow.png")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/image.7z"
+        << ":/assets/image.7z"
         << QString("yellow.png")
         << 800
         << 800;
     QTest::newRow("encoding")
-        << qApp->applicationDirPath() + QDir::separator() + "assets/image.7z"
+        << ":/assets/image.7z"
         << QString("[rootnuko＋H] てにおはっ！ ～女の子だってホントはえっちだよ？～/red.jpg")
         << 225
         << 225;
 }
+
+QTEST_MAIN(TestQt7zPackage)
+#include "Qt7zPackage_Tests.moc"

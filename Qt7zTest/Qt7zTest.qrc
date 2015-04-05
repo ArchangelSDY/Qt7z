@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>assets/image.7z</file>
+        <file>assets/text.7z</file>
+    </qresource>
+</RCC>

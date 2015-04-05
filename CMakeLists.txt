@@ -2,6 +2,8 @@ project (Qt7z)
 cmake_minimum_required(VERSION 2.8.11)
 
 find_package(Qt5Core QUIET)
+find_package(Qt5Test QUIET)
+find_package(Qt5Widgets QUIET)
 
 set(QTCORE_LIBRARIES ${Qt5Core_LIBRARIES})
 # if there is no QT_ROOT, try to deduce it from Qt QtCore include
@@ -9,6 +11,8 @@ if ("${QT_ROOT}" STREQUAL "")
     set(QT_ROOT ${QT_QTCORE_INCLUDE_DIR}/../..)
 endif()
 include_directories(${Qt5Core_INCLUDE_DIRS})
+include_directories(${Qt5Test_INCLUDE_DIRS})
+include_directories(${Qt5Widgets_INCLUDE_DIRS})
 
 macro(qt_wrap_cpp)
     qt5_wrap_cpp(${ARGN})
@@ -22,4 +26,5 @@ set(LIB_DESTINATION "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" CACHE STRING "Lib
 
 add_subdirectory(Qt7z)
 
-install(FILES DESTINATION ${CMAKE_ROOT}/Modules)
+enable_testing()
+add_subdirectory(Qt7zTest)
