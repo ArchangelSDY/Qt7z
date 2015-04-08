@@ -5,9 +5,11 @@
 #include <QString>
 #include <QStringList>
 
+#include "qt7z_global.h"
+
 class Qt7zPackagePrivate;
 
-class Qt7zPackage
+class QT7ZSHARED_EXPORT Qt7zPackage
 {
     friend class Qt7zPackagePrivate;
 public:
