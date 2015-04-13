@@ -12,18 +12,8 @@ class Qt7zPackagePrivate
 {
     friend class Qt7zPackage;
 public:
-    Qt7zPackagePrivate(Qt7zPackage *q) :
-        m_q(q) ,
-        m_blockIndex(0xFFFFFFFF) ,
-        m_outBuffer(0) ,
-        m_outBufferSize(0)
-    {
-        m_allocImp.Alloc = SzAlloc;
-        m_allocImp.Free = SzFree;
-
-        m_allocTempImp.Alloc = SzAllocTemp;
-        m_allocTempImp.Free = SzFreeTemp;
-    }
+    Qt7zPackagePrivate(Qt7zPackage *q);
+    Qt7zPackagePrivate(Qt7zPackage *q, const QString &packagePath);
 
     ~Qt7zPackagePrivate()
     {
@@ -34,7 +24,13 @@ public:
     }
 
 private:
+    void initCallbacks();
+    void reset();
+
     Qt7zPackage *m_q;
+    QString m_packagePath;
+    bool m_isOpen;
+    QStringList m_fileNameList;
 
     // For 7z
     CFileInStream m_archiveStream;
@@ -48,17 +44,58 @@ private:
     size_t m_outBufferSize;
 };
 
+Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q) :
+    m_q(q) ,
+    m_isOpen(false) ,
+    m_blockIndex(0xFFFFFFFF) ,
+    m_outBuffer(0) ,
+    m_outBufferSize(0)
+{
+    initCallbacks();
+}
+
+Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
+                                       const QString &packagePath) :
+    m_q(q) ,
+    m_packagePath(packagePath) ,
+    m_isOpen(false) ,
+    m_blockIndex(0xFFFFFFFF) ,
+    m_outBuffer(0) ,
+    m_outBufferSize(0)
+{
+    initCallbacks();
+}
+
+void Qt7zPackagePrivate::initCallbacks()
+{
+    m_allocImp.Alloc = SzAlloc;
+    m_allocImp.Free = SzFree;
+
+    m_allocTempImp.Alloc = SzAllocTemp;
+    m_allocTempImp.Free = SzFreeTemp;
+}
+
+void Qt7zPackagePrivate::reset()
+{
+    m_packagePath.clear();
+    m_isOpen = false;
+    m_fileNameList.clear();
+
+    m_blockIndex = 0xFFFFFFFF;
+    if (m_outBuffer) {
+        IAlloc_Free(&m_allocImp, m_outBuffer);
+        m_outBufferSize = 0;
+    }
+}
+
+
 Qt7zPackage::Qt7zPackage() :
-    m_p(new Qt7zPackagePrivate(this)) ,
-    m_isOpen(false)
+    m_p(new Qt7zPackagePrivate(this))
 {
 }
 
 Qt7zPackage::Qt7zPackage(const QString &packagePath) :
-    m_p(new Qt7zPackagePrivate(this)) ,
-    m_packagePath(packagePath) ,
-    m_isOpen(false)
-
+    m_p(new Qt7zPackagePrivate(this, packagePath))
 {
 }
 
@@ -70,22 +107,9 @@ Qt7zPackage::~Qt7zPackage()
     }
 }
 
-void Qt7zPackage::reset()
-{
-    m_packagePath.clear();
-    m_isOpen = false;
-    m_fileNameList.clear();
-
-    m_p->m_blockIndex = 0xFFFFFFFF;
-    if (m_p->m_outBuffer) {
-        IAlloc_Free(&(m_p->m_allocImp), m_p->m_outBuffer);
-        m_p->m_outBufferSize = 0;
-    }
-}
-
 bool Qt7zPackage::open()
 {
-    if (m_isOpen) {
+    if (m_p->m_isOpen) {
         return false;
     }
 
@@ -94,9 +118,9 @@ bool Qt7zPackage::open()
     size_t tempSize = 0;
 
     if (InFile_Open(&(m_p->m_archiveStream.file),
-                    m_packagePath.toUtf8().data())) {
-        qDebug() << "Can not open file: " << m_packagePath;
-        m_isOpen = false;
+                    m_p->m_packagePath.toUtf8().data())) {
+        qDebug() << "Can not open file: " << m_p->m_packagePath;
+        m_p->m_isOpen = false;
         return false;
     }
 
@@ -130,7 +154,7 @@ bool Qt7zPackage::open()
 
             // TODO: Codec?
             QString fileName = QString::fromUtf16(temp);
-            m_fileNameList << fileName;
+            m_p->m_fileNameList << fileName;
 
             if (res != SZ_OK)
                 break;
@@ -140,31 +164,31 @@ bool Qt7zPackage::open()
     SzFree(NULL, temp);
 
     if (res == SZ_OK) {
-        m_isOpen = true;
+        m_p->m_isOpen = true;
         return true;
     } else {
-        m_isOpen = false;
+        m_p->m_isOpen = false;
         return false;
     }
 }
 
 void Qt7zPackage::close()
 {
-    if (m_isOpen) {
+    if (m_p->m_isOpen) {
         SzArEx_Free(&(m_p->m_db), &(m_p->m_allocImp));
         File_Close(&(m_p->m_archiveStream.file));
-        m_isOpen = false;
+        m_p->m_isOpen = false;
     }
 }
 
 bool Qt7zPackage::isOpen() const
 {
-    return m_isOpen;
+    return m_p->m_isOpen;
 }
 
 QStringList Qt7zPackage::getFileNameList() const
 {
-    return m_fileNameList;
+    return m_p->m_fileNameList;
 }
 
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
@@ -174,14 +198,14 @@ bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
         return false;
     }
 
-    if (!m_isOpen) {
+    if (!m_p->m_isOpen) {
         if (!open()) {
             qDebug() << "Cannot open package for extracting!";
             return false;
         }
     }
 
-    int index = m_fileNameList.indexOf(name);
+    int index = m_p->m_fileNameList.indexOf(name);
     if (index == -1) {
         qDebug() << "Cannot find file: " << name;
         return false;

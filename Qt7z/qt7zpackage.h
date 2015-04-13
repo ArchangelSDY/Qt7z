@@ -26,12 +26,7 @@ public:
     bool extractFile(const QString &name, QIODevice *outStream);
 
 private:
-    void reset();
-
     Qt7zPackagePrivate *m_p;
-    QString m_packagePath;
-    bool m_isOpen;
-    QStringList m_fileNameList;
 };
 
 #endif // QT7ZPACKAGE_H
