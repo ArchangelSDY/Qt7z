@@ -5,7 +5,8 @@
 #include <QTemporaryFile>
 #include <QTest>
 
-#include "../Qt7z/Qt7zPackage.h"
+#include "../Qt7z/qt7zfileinfo.h"
+#include "../Qt7z/qt7zpackage.h"
 
 class TestQt7zPackage : public QObject
 {
@@ -17,6 +18,8 @@ private slots:
     void openAndClose_data();
     void getFileNameList();
     void getFileNameList_data();
+    void fileInfoList();
+    void fileInfoList_data();
     void extractFile_text();
     void extractFile_text_data();
     void extractFile_image();
@@ -100,6 +103,8 @@ void TestQt7zPackage::getFileNameList()
     foreach (const QString &actualFileName, actualFileNameList) {
         QVERIFY(expectFileNameList.contains(actualFileName));
     }
+
+    QCOMPARE(pkg.getFileNameList(), pkg.fileNameList());
 }
 
 void TestQt7zPackage::getFileNameList_data()
@@ -110,6 +115,63 @@ void TestQt7zPackage::getFileNameList_data()
     QTest::newRow("text.7z")
         << ":/assets/text.7z"
         << (QStringList() << "1.txt" << "2.txt" << "sub/1.txt");
+}
+
+void TestQt7zPackage::fileInfoList()
+{
+    QFETCH(QString, rcPkgPath);
+    QFETCH(QStringList, expFileNames);
+    QFETCH(QList<quint64>, expFileSizes);
+    QFETCH(QList<bool>, expIsDirs);
+    QFETCH(QList<bool>, expIsCrcDefineds);
+    QFETCH(QList<quint32>, expCrcs);
+
+    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
+    QString localPkgPath = localPkg.isNull()
+        ? rcPkgPath
+        : localPkg->fileName();
+
+    Qt7zPackage pkg(localPkgPath);
+
+    QVERIFY(pkg.open());
+
+    const QList<Qt7zFileInfo> &fileInfos = pkg.fileInfoList();
+    QCOMPARE(fileInfos.count(), expFileNames.count());
+
+    for (int i = 0; i < fileInfos.count(); ++i) {
+        const Qt7zFileInfo &fileInfo = fileInfos[i];
+
+        QCOMPARE(fileInfo.fileName, expFileNames[i]);
+        QCOMPARE(fileInfo.size, expFileSizes[i]);
+        QCOMPARE(fileInfo.isDir, expIsDirs[i]);
+        QCOMPARE(fileInfo.isCrcDefined, expIsCrcDefineds[i]);
+        QCOMPARE(fileInfo.crc, expCrcs[i]);
+    }
+}
+
+void TestQt7zPackage::fileInfoList_data()
+{
+    QTest::addColumn<QString>("rcPkgPath");
+    QTest::addColumn<QStringList>("expFileNames");
+    QTest::addColumn<QList<quint64> >("expFileSizes");
+    QTest::addColumn<QList<bool> >("expIsDirs");
+    QTest::addColumn<QList<bool> >("expIsCrcDefineds");
+    QTest::addColumn<QList<quint32> >("expCrcs");
+
+    QTest::newRow("text.7z")
+        << ":/assets/text.7z"
+        << (QStringList() << "1.txt" << "2.txt" << "sub/1.txt")
+        << (QList<quint64>() << 10 << 10 << 10)
+        << (QList<bool>() << false << false << false)
+        << (QList<bool>() << true << true << true)
+        << (QList<quint32>() << 2534262748 << 2696674444 << 2534262748);
+    QTest::newRow("mixed.7z")
+        << ":/assets/mixed.7z"
+        << (QStringList() << "yellow.png" << "1.txt" << "sub/1.txt" << "sub")
+        << (QList<quint64>() << 4323 << 10 << 10 << 0)
+        << (QList<bool>() << false << false << false << true)
+        << (QList<bool>() << true << true << true << false)
+        << (QList<quint32>() << 2786803049 << 2534262748 << 2534262748 << 0);
 }
 
 void TestQt7zPackage::extractFile_text()

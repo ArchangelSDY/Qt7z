@@ -1,10 +1,12 @@
+#include "qt7zpackage.h"
+
 #include "7z/7z.h"
 #include "7z/7zAlloc.h"
 #include "7z/7zCrc.h"
 #include "7z/7zFile.h"
 #include "7z/7zVersion.h"
 
-#include "Qt7zPackage.h"
+#include "qt7zfileinfo.h"
 
 #include <QDebug>
 
@@ -31,6 +33,7 @@ private:
     QString m_packagePath;
     bool m_isOpen;
     QStringList m_fileNameList;
+    QList<Qt7zFileInfo> m_fileInfoList;
 
     // For 7z
     CFileInStream m_archiveStream;
@@ -80,6 +83,7 @@ void Qt7zPackagePrivate::reset()
     m_packagePath.clear();
     m_isOpen = false;
     m_fileNameList.clear();
+    m_fileInfoList.clear();
 
     m_blockIndex = 0xFFFFFFFF;
     if (m_outBuffer) {
@@ -126,7 +130,7 @@ bool Qt7zPackage::open()
 
     FileInStream_CreateVTable(&(m_p->m_archiveStream));
     LookToRead_CreateVTable(&(m_p->m_lookStream), False);
-    
+
     m_p->m_lookStream.realStream = &(m_p->m_archiveStream.s);
     LookToRead_Init(&(m_p->m_lookStream));
 
@@ -155,6 +159,16 @@ bool Qt7zPackage::open()
             // TODO: Codec?
             QString fileName = QString::fromUtf16(temp);
             m_p->m_fileNameList << fileName;
+
+            const CSzFileItem &fileItem = m_p->m_db.db.Files[i];
+            Qt7zFileInfo fileInfo;
+            fileInfo.fileName = fileName;
+            fileInfo.arcName = m_p->m_packagePath;
+            fileInfo.size = fileItem.Size;
+            fileInfo.isDir = fileItem.IsDir;
+            fileInfo.isCrcDefined = fileItem.CrcDefined;
+            fileInfo.crc = fileItem.Crc;
+            m_p->m_fileInfoList << fileInfo;
 
             if (res != SZ_OK)
                 break;
@@ -189,6 +203,16 @@ bool Qt7zPackage::isOpen() const
 QStringList Qt7zPackage::getFileNameList() const
 {
     return m_p->m_fileNameList;
+}
+
+QStringList Qt7zPackage::fileNameList() const
+{
+    return m_p->m_fileNameList;
+}
+
+QList<Qt7zFileInfo> &Qt7zPackage::fileInfoList() const
+{
+    return m_p->m_fileInfoList;
 }
 
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)

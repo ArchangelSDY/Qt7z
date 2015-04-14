@@ -7,6 +7,7 @@
 
 #include "qt7z_global.h"
 
+struct Qt7zFileInfo;
 class Qt7zPackagePrivate;
 
 class QT7ZSHARED_EXPORT Qt7zPackage
@@ -23,9 +24,14 @@ public:
     bool isOpen() const;
     QStringList getFileNameList() const;
 
+    QStringList fileNameList() const;
+    QList<Qt7zFileInfo> &fileInfoList() const;
+
     bool extractFile(const QString &name, QIODevice *outStream);
 
 private:
+    void reset();
+
     Qt7zPackagePrivate *m_p;
 };
 
