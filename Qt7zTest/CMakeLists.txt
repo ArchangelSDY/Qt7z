@@ -5,6 +5,10 @@ include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
+add_definitions(
+    -DQT7Z_LIBRARY
+)
+
 set(CMAKE_AUTOMOC ON)
 
 file(GLOB TEST_COMMON_RESOURCES

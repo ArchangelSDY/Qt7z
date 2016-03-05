@@ -2,7 +2,7 @@
 #include <QImage>
 #include <QScopedPointer>
 #include <QStringList>
-#include <QTemporaryFile>
+#include <QTemporaryDir>
 #include <QTest>
 
 #include "../Qt7z/qt7zfileinfo.h"
@@ -26,31 +26,39 @@ private slots:
     void extractFile_image_data();
 
 private:
-    QFile *extractResource(const QString &path);
+    QString extractResource(const QString &path);
+
+    QTemporaryDir m_tempDir;
 };
 
 void TestQt7zPackage::initTestCase()
 {
     Q_INIT_RESOURCE(Qt7zTest);
+
+    if (!m_tempDir.isValid()) {
+        QFAIL("Cannot create temporary directory for test materials");
+    }
 }
 
-QFile *TestQt7zPackage::extractResource(const QString &path)
+QString TestQt7zPackage::extractResource(const QString &path)
 {
     QFile r(path);
     if (!r.open(QIODevice::ReadOnly)) {
-        return 0;
+        return QString();
     }
 
-    QTemporaryFile *f = new QTemporaryFile();
-    if (!f->open()) {
-        delete f;
-        return 0;
+    QFileInfo info(path);
+    const QString &fileName = info.fileName();
+
+    QFile w(m_tempDir.path() + "/" + fileName);
+    if (!w.open(QIODevice::WriteOnly)) {
+        return QString();
     }
 
-    f->write(r.readAll());
-    f->close();
+    w.write(r.readAll());
+    w.close();
 
-    return f;
+    return w.fileName();
 }
 
 void TestQt7zPackage::openAndClose()
@@ -58,10 +66,7 @@ void TestQt7zPackage::openAndClose()
     QFETCH(QString, rcPkgPath);
     QFETCH(bool, valid);
 
-    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
-    QString localPkgPath = localPkg.isNull()
-        ? rcPkgPath
-        : localPkg->fileName();
+    const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
     QCOMPARE(pkg.open(), valid);
@@ -88,10 +93,7 @@ void TestQt7zPackage::getFileNameList()
     QFETCH(QString, rcPkgPath);
     QFETCH(QStringList, expectFileNameList);
 
-    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
-    QString localPkgPath = localPkg.isNull()
-        ? rcPkgPath
-        : localPkg->fileName();
+    const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
 
@@ -126,10 +128,7 @@ void TestQt7zPackage::fileInfoList()
     QFETCH(QList<bool>, expIsCrcDefineds);
     QFETCH(QList<quint32>, expCrcs);
 
-    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
-    QString localPkgPath = localPkg.isNull()
-        ? rcPkgPath
-        : localPkg->fileName();
+    const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
 
@@ -180,10 +179,7 @@ void TestQt7zPackage::extractFile_text()
     QFETCH(QString, fileName);
     QFETCH(QString, fileContent);
 
-    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
-    QString localPkgPath = localPkg.isNull()
-        ? rcPkgPath
-        : localPkg->fileName();
+    const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
 
@@ -222,10 +218,7 @@ void TestQt7zPackage::extractFile_image()
     QFETCH(int, width);
     QFETCH(int, height);
 
-    QScopedPointer<QFile> localPkg(extractResource(rcPkgPath));
-    QString localPkgPath = localPkg.isNull()
-        ? rcPkgPath
-        : localPkg->fileName();
+    const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
 
