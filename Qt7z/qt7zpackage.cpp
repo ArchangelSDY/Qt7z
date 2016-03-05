@@ -121,8 +121,13 @@ bool Qt7zPackage::open()
     UInt16 *temp = NULL;
     size_t tempSize = 0;
 
+#ifdef Q_OS_WIN
+    std::wstring packagePathW = m_p->m_packagePath.toStdWString();
+    if (InFile_OpenW(&(m_p->m_archiveStream.file), packagePathW.data())) {
+#else
     if (InFile_Open(&(m_p->m_archiveStream.file),
                     m_p->m_packagePath.toUtf8().data())) {
+#endif
         qDebug() << "Can not open file: " << m_p->m_packagePath;
         m_p->m_isOpen = false;
         return false;
