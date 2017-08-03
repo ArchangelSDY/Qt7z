@@ -1,0 +1,205 @@
+- Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp      |  2 ++
+ Qt7z/7zip/CPP/7zip/Common/RegisterArc.h           |  6 ++++++
+ Qt7z/7zip/CPP/7zip/Common/RegisterCodec.h         |  6 ++++++
+ Qt7z/7zip/CPP/7zip/Compress/BZip2Register.cpp     |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/Bcj2Register.cpp      |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/BcjRegister.cpp       |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/BranchRegister.cpp    |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/CopyRegister.cpp      |  6 ++++++
+ Qt7z/7zip/CPP/7zip/Compress/Deflate64Register.cpp | 10 +++++++++-
+ Qt7z/7zip/CPP/7zip/Compress/DeflateRegister.cpp   |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/Lzma2Register.cpp     |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/LzmaRegister.cpp      |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/PpmdRegister.cpp      |  2 ++
+ Qt7z/7zip/CPP/7zip/Compress/RarCodecsRegister.cpp |  6 ++++++
+ Qt7z/7zip/CPP/Common/CRC.cpp                      |  4 ++++
+ 15 files changed, 55 insertions(+), 1 deletion(-)
+
+diff --git a/Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp b/Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp
+index 389b540..0865616 100644
+--- a/Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp
+@@ -18,4 +18,6 @@ REGISTER_ARC_IO_DECREMENT_SIG(
+   NArcInfoFlags::kFindSignature,
+   NULL);
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Common/RegisterArc.h b/Qt7z/7zip/CPP/7zip/Common/RegisterArc.h
+index 3421ba1..8b6c757 100644
+--- a/Qt7z/7zip/CPP/7zip/Common/RegisterArc.h
++++ b/Qt7z/7zip/CPP/7zip/Common/RegisterArc.h
+@@ -75,4 +75,10 @@ void RegisterArc(const CArcInfo *arcInfo) throw();
+   struct CRegisterArcDecSig { CRegisterArcDecSig() { sig[0]--; RegisterArc(&g_ArcInfo); }}; \
+   static CRegisterArcDecSig g_RegisterArc;
+ 
++#ifdef QT7Z_STATIC_LINK
++#define QT7Z_STATIC_LINK_FORCE_INCLUDE bool g_forceLink;
++#else
++#define QT7Z_STATIC_LINK_FORCE_INCLUDE
++#endif
++
+ #endif
+diff --git a/Qt7z/7zip/CPP/7zip/Common/RegisterCodec.h b/Qt7z/7zip/CPP/7zip/Common/RegisterCodec.h
+index 7ddb760..d19cf37 100644
+--- a/Qt7z/7zip/CPP/7zip/Common/RegisterCodec.h
++++ b/Qt7z/7zip/CPP/7zip/Common/RegisterCodec.h
+@@ -104,3 +104,9 @@ void RegisterHasher(const CHasherInfo *hasher) throw();
+     static REGISTER_HASHER_NAME(cls) g_RegisterHasher;
+ 
+ #endif
++
++#ifdef QT7Z_STATIC_LINK
++#define QT7Z_STATIC_LINK_FORCE_INCLUDE bool g_forceLink;
++#else
++#define QT7Z_STATIC_LINK_FORCE_INCLUDE
++#endif
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/BZip2Register.cpp b/Qt7z/7zip/CPP/7zip/Compress/BZip2Register.cpp
+index 6e96036..2541223 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/BZip2Register.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/BZip2Register.cpp
+@@ -22,4 +22,6 @@ REGISTER_CODEC_CREATE(CreateEnc, CEncoder)
+ 
+ REGISTER_CODEC_2(BZip2, CreateDec, CreateEnc, 0x40202, "BZip2")
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/Bcj2Register.cpp b/Qt7z/7zip/CPP/7zip/Compress/Bcj2Register.cpp
+index 7a48f91..5873e5c 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/Bcj2Register.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/Bcj2Register.cpp
+@@ -21,4 +21,6 @@ REGISTER_CODEC_VAR
+ 
+ REGISTER_CODEC(BCJ2)
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/BcjRegister.cpp b/Qt7z/7zip/CPP/7zip/Compress/BcjRegister.cpp
+index f06dcfe..8dc852b 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/BcjRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/BcjRegister.cpp
+@@ -14,4 +14,6 @@ REGISTER_FILTER_E(BCJ,
+     CCoder(true),
+     0x3030103, "BCJ")
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/BranchRegister.cpp b/Qt7z/7zip/CPP/7zip/Compress/BranchRegister.cpp
+index 6331c1b..52d1bd5 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/BranchRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/BranchRegister.cpp
+@@ -38,4 +38,6 @@ REGISTER_CODECS_VAR
+ 
+ REGISTER_CODECS(Branch)
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/CopyRegister.cpp b/Qt7z/7zip/CPP/7zip/Compress/CopyRegister.cpp
+index 7141ab5..bd1e751 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/CopyRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/CopyRegister.cpp
+@@ -12,4 +12,10 @@ REGISTER_CODEC_CREATE(CreateCodec, CCopyCoder())
+ 
+ REGISTER_CODEC_2(Copy, CreateCodec, CreateCodec, 0, "Copy")
+ 
++namespace NCopy {
++
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
++}
++
+ }
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/Deflate64Register.cpp b/Qt7z/7zip/CPP/7zip/Compress/Deflate64Register.cpp
+index 14d20bb..fc5600a 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/Deflate64Register.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/Deflate64Register.cpp
+@@ -23,4 +23,12 @@ REGISTER_CODEC_CREATE(CreateEnc, NEncoder::CCOMCoder64())
+ 
+ REGISTER_CODEC_2(Deflate64, CreateDec, CreateEnc, 0x40109, "Deflate64")
+ 
+-}}
++}
++
++namespace NDeflate64 {
++
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
++}
++
++}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/DeflateRegister.cpp b/Qt7z/7zip/CPP/7zip/Compress/DeflateRegister.cpp
+index 387be6e..69f04d7 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/DeflateRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/DeflateRegister.cpp
+@@ -22,4 +22,6 @@ REGISTER_CODEC_CREATE(CreateEnc, NEncoder::CCOMCoder)
+ 
+ REGISTER_CODEC_2(Deflate, CreateDec, CreateEnc, 0x40108, "Deflate")
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/Lzma2Register.cpp b/Qt7z/7zip/CPP/7zip/Compress/Lzma2Register.cpp
+index 8f279eb..6f09668 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/Lzma2Register.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/Lzma2Register.cpp
+@@ -19,4 +19,6 @@ REGISTER_CODEC_E(LZMA2,
+     0x21,
+     "LZMA2")
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/LzmaRegister.cpp b/Qt7z/7zip/CPP/7zip/Compress/LzmaRegister.cpp
+index c802a99..e665ff7 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/LzmaRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/LzmaRegister.cpp
+@@ -19,4 +19,6 @@ REGISTER_CODEC_E(LZMA,
+     0x30101,
+     "LZMA")
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/PpmdRegister.cpp b/Qt7z/7zip/CPP/7zip/Compress/PpmdRegister.cpp
+index a3ebb5f..a1666c7 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/PpmdRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/PpmdRegister.cpp
+@@ -19,4 +19,6 @@ REGISTER_CODEC_E(PPMD,
+     0x30401,
+     "PPMD")
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Compress/RarCodecsRegister.cpp b/Qt7z/7zip/CPP/7zip/Compress/RarCodecsRegister.cpp
+index e1bc3d9..b5f12ec 100644
+--- a/Qt7z/7zip/CPP/7zip/Compress/RarCodecsRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Compress/RarCodecsRegister.cpp
+@@ -30,4 +30,10 @@ REGISTER_CODECS_VAR
+ 
+ REGISTER_CODECS(Rar)
+ 
++namespace NRAR {
++
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
++}
++
+ }
+diff --git a/Qt7z/7zip/CPP/Common/CRC.cpp b/Qt7z/7zip/CPP/Common/CRC.cpp
+index 9a9f81f..3a14c64 100644
+--- a/Qt7z/7zip/CPP/Common/CRC.cpp
++++ b/Qt7z/7zip/CPP/Common/CRC.cpp
+@@ -5,3 +5,7 @@
+ #include "../../C/7zCrc.h"
+ 
+ struct CCRCTableInit { CCRCTableInit() { CrcGenerateTable(); } } g_CRCTableInit;
++
++#ifdef QT7Z_STATIC_LINK
++bool g_forceLinkCRC;
++#endif
