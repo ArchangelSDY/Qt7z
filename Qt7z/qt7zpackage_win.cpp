@@ -33,14 +33,10 @@ namespace NCompress {
     NAMESPACE_FORCE_LINK(Bcj)
     NAMESPACE_FORCE_LINK(Bcj2)
     NAMESPACE_FORCE_LINK(Branch)
-    NAMESPACE_FORCE_LINK(BZip2)
     NAMESPACE_FORCE_LINK(Copy)
-    NAMESPACE_FORCE_LINK(Deflate)
-    NAMESPACE_FORCE_LINK(Deflate64)
     NAMESPACE_FORCE_LINK(Lzma)
     NAMESPACE_FORCE_LINK(Lzma2)
     NAMESPACE_FORCE_LINK(Ppmd)
-    NAMESPACE_FORCE_LINK(RAR)
 }
 
 namespace NCrypto {
@@ -245,14 +241,10 @@ void Qt7zPackagePrivate::forceLinkCodecs()
     REFER_TO_FORCE_LINK(Compress, Bcj)
     REFER_TO_FORCE_LINK(Compress, Bcj2)
     REFER_TO_FORCE_LINK(Compress, Branch)
-    REFER_TO_FORCE_LINK(Compress, BZip2)
     REFER_TO_FORCE_LINK(Compress, Copy)
-    REFER_TO_FORCE_LINK(Compress, Deflate)
-    REFER_TO_FORCE_LINK(Compress, Deflate64)
     REFER_TO_FORCE_LINK(Compress, Lzma)
     REFER_TO_FORCE_LINK(Compress, Lzma2)
     REFER_TO_FORCE_LINK(Compress, Ppmd)
-    REFER_TO_FORCE_LINK(Compress, RAR)
     REFER_TO_FORCE_LINK(Crypto, 7z)
     REFER_TO_FORCE_LINK(Crypto, Aes)
 }
@@ -385,6 +377,7 @@ bool Qt7zPackage::open()
     }
 
     m_p->m_isOpen = true;
+    m_p->m_lastError = Qt7zPackage::Error::NoError;
 
     return true;
 }
