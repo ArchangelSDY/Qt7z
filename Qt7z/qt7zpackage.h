@@ -14,6 +14,11 @@ class QT7ZSHARED_EXPORT Qt7zPackage
 {
     friend class Qt7zPackagePrivate;
 public:
+    enum class Error {
+        NoError,
+        PasswordRequired,
+    };
+
     Qt7zPackage();
     Qt7zPackage(const QString &packagePath);
     ~Qt7zPackage();
@@ -26,6 +31,10 @@ public:
 
     QStringList fileNameList() const;
     QList<Qt7zFileInfo> &fileInfoList() const;
+
+    void setPassword(const QString &password);
+
+    Error lastError() const;
 
     bool extractFile(const QString &name, QIODevice *outStream);
 

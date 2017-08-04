@@ -34,6 +34,7 @@ private:
     bool m_isOpen;
     QStringList m_fileNameList;
     QList<Qt7zFileInfo> m_fileInfoList;
+    Qt7zPackage::Error m_lastError;
 
     // For 7z
     CFileInStream m_archiveStream;
@@ -50,6 +51,7 @@ private:
 Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q) :
     m_q(q) ,
     m_isOpen(false) ,
+    m_lastError(Qt7zPackage::NoError) ,
     m_blockIndex(0xFFFFFFFF) ,
     m_outBuffer(0) ,
     m_outBufferSize(0)
@@ -62,6 +64,7 @@ Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
     m_q(q) ,
     m_packagePath(packagePath) ,
     m_isOpen(false) ,
+    m_lastError(Qt7zPackage::NoError) ,
     m_blockIndex(0xFFFFFFFF) ,
     m_outBuffer(0) ,
     m_outBufferSize(0)
@@ -218,6 +221,16 @@ QStringList Qt7zPackage::fileNameList() const
 QList<Qt7zFileInfo> &Qt7zPackage::fileInfoList() const
 {
     return m_p->m_fileInfoList;
+}
+
+void Qt7zPackge::setPassword(const QString &password)
+{
+    qWarning() << "Qt7z: setPassword() not implemented on this platform";
+}
+
+Qt7zPackage::Error Qt7zPackage::lastError() const
+{
+    return m_p->m_lastError;
 }
 
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)

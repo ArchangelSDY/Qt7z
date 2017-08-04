@@ -3,5 +3,7 @@
         <file>assets/image.7z</file>
         <file>assets/mixed.7z</file>
         <file>assets/text.7z</file>
+        <file>assets/password.7z</file>
+        <file>assets/password-filename.7z</file>
     </qresource>
 </RCC>

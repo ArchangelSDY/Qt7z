@@ -1,20 +1,3 @@
-- Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp      |  2 ++
- Qt7z/7zip/CPP/7zip/Common/RegisterArc.h           |  6 ++++++
- Qt7z/7zip/CPP/7zip/Common/RegisterCodec.h         |  6 ++++++
- Qt7z/7zip/CPP/7zip/Compress/BZip2Register.cpp     |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/Bcj2Register.cpp      |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/BcjRegister.cpp       |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/BranchRegister.cpp    |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/CopyRegister.cpp      |  6 ++++++
- Qt7z/7zip/CPP/7zip/Compress/Deflate64Register.cpp | 10 +++++++++-
- Qt7z/7zip/CPP/7zip/Compress/DeflateRegister.cpp   |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/Lzma2Register.cpp     |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/LzmaRegister.cpp      |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/PpmdRegister.cpp      |  2 ++
- Qt7z/7zip/CPP/7zip/Compress/RarCodecsRegister.cpp |  6 ++++++
- Qt7z/7zip/CPP/Common/CRC.cpp                      |  4 ++++
- 15 files changed, 55 insertions(+), 1 deletion(-)
-
 diff --git a/Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp b/Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp
 index 389b540..0865616 100644
 --- a/Qt7z/7zip/CPP/7zip/Archive/7z/7zRegister.cpp
@@ -185,6 +168,32 @@ index e1bc3d9..b5f12ec 100644
  REGISTER_CODECS(Rar)
  
 +namespace NRAR {
++
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
++}
++
+ }
+diff --git a/Qt7z/7zip/CPP/7zip/Crypto/7zAesRegister.cpp b/Qt7z/7zip/CPP/7zip/Crypto/7zAesRegister.cpp
+index f9d5969..7fe6170 100644
+--- a/Qt7z/7zip/CPP/7zip/Crypto/7zAesRegister.cpp
++++ b/Qt7z/7zip/CPP/7zip/Crypto/7zAesRegister.cpp
+@@ -14,4 +14,6 @@ REGISTER_FILTER_E(7zAES,
+     CEncoder(),
+     0x6F10701, "7zAES")
+ 
++QT7Z_STATIC_LINK_FORCE_INCLUDE
++
+ }}
+diff --git a/Qt7z/7zip/CPP/7zip/Crypto/MyAesReg.cpp b/Qt7z/7zip/CPP/7zip/Crypto/MyAesReg.cpp
+index 2800683..3ffb119 100644
+--- a/Qt7z/7zip/CPP/7zip/Crypto/MyAesReg.cpp
++++ b/Qt7z/7zip/CPP/7zip/Crypto/MyAesReg.cpp
+@@ -13,4 +13,10 @@ REGISTER_FILTER_E(AES256CBC,
+     CAesCbcEncoder(32),
+     0x6F00181, "AES256CBC")
+ 
++namespace NAes {
 +
 +QT7Z_STATIC_LINK_FORCE_INCLUDE
 +

@@ -43,6 +43,11 @@ namespace NCompress {
     NAMESPACE_FORCE_LINK(RAR)
 }
 
+namespace NCrypto {
+    NAMESPACE_FORCE_LINK(7z)
+    NAMESPACE_FORCE_LINK(Aes)
+}
+
 extern bool g_forceLinkCRC;
 
 struct CListUInt64Def
@@ -86,7 +91,15 @@ HRESULT SequentialStreamAdapter::Write(const void *data, UInt32 size, UInt32 *pr
 class OpenCallback : public IOpenCallbackUI, public CMyUnknownImp
 {
 public:
+    OpenCallback(const QString &password) :
+        m_password(password)
+    {
+    }
+
     INTERFACE_IOpenCallbackUI(override;)
+
+private:
+    QString m_password;
 };
 
 HRESULT OpenCallback::Open_CheckBreak()
@@ -111,20 +124,24 @@ HRESULT OpenCallback::Open_Finished()
 
 HRESULT OpenCallback::Open_CryptoGetTextPassword(BSTR *password)
 {
+    std::wstring wpassword = m_password.toStdWString();
+    *password = SysAllocStringLen(wpassword.data(), wpassword.size());
     return S_OK;
 }
 
-class ExtractCallback : public IArchiveExtractCallback, public CMyUnknownImp
+class ExtractCallback : public IArchiveExtractCallback, public ICryptoGetTextPassword, public CMyUnknownImp
 {
 public:
-    MY_UNKNOWN_IMP1(IArchiveExtractCallback)
+    MY_UNKNOWN_IMP2(IArchiveExtractCallback, ICryptoGetTextPassword)
     INTERFACE_IArchiveExtractCallback(;)
+    STDMETHOD(CryptoGetTextPassword)(BSTR *password) override;
 
-    ExtractCallback(QIODevice *outStream) :
-        m_outStream(outStream) {}
+    ExtractCallback(QIODevice *outStream, const QString &password) :
+        m_outStream(outStream), m_password(password) {}
 
 private:
     QIODevice *m_outStream;
+    QString m_password;
 };
 
 HRESULT ExtractCallback::SetTotal(UInt64 total)
@@ -159,6 +176,13 @@ HRESULT ExtractCallback::SetOperationResult(Int32 opRes)
     return S_OK;
 }
 
+HRESULT ExtractCallback::CryptoGetTextPassword(BSTR *password)
+{
+    std::wstring wpassword = m_password.toStdWString();
+    *password = SysAllocStringLen(wpassword.data(), wpassword.size());
+    return S_OK;
+}
+
 class Qt7zPackagePrivate
 {
     friend class Qt7zPackage;
@@ -173,10 +197,12 @@ private:
 
     Qt7zPackage *m_q;
     QString m_packagePath;
+    QString m_password;
     bool m_isOpen;
     QStringList m_fileNameList;
     QHash<QString, UInt32> m_fileNameToIndex;
     QList<Qt7zFileInfo> m_fileInfoList;
+    Qt7zPackage::Error m_lastError;
 
     QScopedPointer<CCodecs> m_codecs;
     CArchiveLink m_arcLink;
@@ -184,7 +210,8 @@ private:
 
 Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q) :
     m_q(q) ,
-    m_isOpen(false)
+    m_isOpen(false) ,
+    m_lastError(Qt7zPackage::Error::NoError)
 {
     init();
 }
@@ -193,7 +220,8 @@ Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
                                        const QString &packagePath) :
     m_q(q) ,
     m_packagePath(packagePath) ,
-    m_isOpen(false)
+    m_isOpen(false) ,
+    m_lastError(Qt7zPackage::Error::NoError)
 {
     init();
 }
@@ -211,7 +239,7 @@ void Qt7zPackagePrivate::forceLinkCodecs()
     bool forceLinkCRC = g_forceLinkCRC;
 
 #define REFER_TO_FORCE_LINK(NAMESPACE, CODEC) \
-    bool forceLink##CODEC = N##NAMESPACE::N##CODEC::g_forceLink;
+    bool forceLink##NAMESPACE##CODEC = N##NAMESPACE::N##CODEC::g_forceLink;
 
     REFER_TO_FORCE_LINK(Archive, 7z)
     REFER_TO_FORCE_LINK(Compress, Bcj)
@@ -225,6 +253,8 @@ void Qt7zPackagePrivate::forceLinkCodecs()
     REFER_TO_FORCE_LINK(Compress, Lzma2)
     REFER_TO_FORCE_LINK(Compress, Ppmd)
     REFER_TO_FORCE_LINK(Compress, RAR)
+    REFER_TO_FORCE_LINK(Crypto, 7z)
+    REFER_TO_FORCE_LINK(Crypto, Aes)
 }
 
 void Qt7zPackagePrivate::reset()
@@ -259,7 +289,7 @@ bool Qt7zPackage::open()
         return false;
     }
 
-    // TODO: Set password callback
+    m_p->m_arcLink.NonOpen_ErrorInfo.ClearErrors_Full();
 
     CObjectVector<CProperty> props;
     CObjectVector<COpenType> types;   // TODO: ok to leave blank?
@@ -276,7 +306,7 @@ bool Qt7zPackage::open()
     std::wstring packagePathW = m_p->m_packagePath.toStdWString();
     options.filePath = UString(packagePathW.data());
 
-    OpenCallback callback;
+    OpenCallback callback(m_p->m_password);
 
     HRESULT res;
     try {
@@ -288,6 +318,10 @@ bool Qt7zPackage::open()
     }
 
     if (res != S_OK) {
+        if (m_p->m_arcLink.PasswordWasAsked) {
+            m_p->m_lastError = Qt7zPackage::Error::PasswordRequired;
+        }
+
         qDebug() << "Qt7z: Fail to open archive with result" << res;
         return false;
     }
@@ -382,6 +416,16 @@ QList<Qt7zFileInfo> &Qt7zPackage::fileInfoList() const
     return m_p->m_fileInfoList;
 }
 
+void Qt7zPackage::setPassword(const QString &password)
+{
+    m_p->m_password = password;
+}
+
+Qt7zPackage::Error Qt7zPackage::lastError() const
+{
+    return m_p->m_lastError;
+}
+
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
 {
     if (!outStream || !outStream->isWritable()) {
@@ -409,7 +453,7 @@ bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
     realIndices.Add(index);
     Int32 testMode = 0;
 
-    CMyComPtr<ExtractCallback> callback(new ExtractCallback(outStream));
+    CMyComPtr<ExtractCallback> callback(new ExtractCallback(outStream, m_p->m_password));
     HRESULT res = archive->Extract(&realIndices.Front(), realIndices.Size(), testMode, callback);
     if (res != S_OK) {
         qDebug() << "Qt7z: Fail to extract file" << name << "with result" << res;

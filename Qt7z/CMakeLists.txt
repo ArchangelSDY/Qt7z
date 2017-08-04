@@ -25,6 +25,8 @@ if (WIN32)
         "7zip/C/7zCrc.c"
         "7zip/C/7zCrcOpt.c"
         "7zip/C/7zStream.c"
+        "7zip/C/Aes.c"
+        "7zip/C/AesOpt.c"
         "7zip/C/Alloc.c"
         "7zip/C/Bcj2.c"
         "7zip/C/Bcj2Enc.c"
