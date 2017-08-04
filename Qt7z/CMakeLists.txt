@@ -228,8 +228,11 @@ if (WIN32)
         "qt7zpackage_win.cpp"
     )
 else (WIN32)
-    # TODO: Exclude *_win.cpp
-    file(GLOB SRCS "*.c" "*.cpp" "7z/*.c")
+    file(GLOB 7Z_SRCS "7z/*.c")
+    set(SRCS ${7Z_SRCS}
+        "qt7zfileinfo.cpp"
+        "qt7zpackage.cpp"
+    )
 endif (WIN32)
 
 file(GLOB PUBLIC_HEADERS "*.h")

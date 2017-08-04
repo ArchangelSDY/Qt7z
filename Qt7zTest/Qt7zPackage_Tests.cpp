@@ -16,7 +16,9 @@ private slots:
 
     void openAndClose();
     void openAndClose_data();
+#ifdef Q_OS_WIN
     void openAndClosePasswordFilename();
+#endif
     void getFileNameList();
     void getFileNameList_data();
     void fileInfoList();
@@ -84,14 +86,17 @@ void TestQt7zPackage::openAndClose_data()
     QTest::newRow("text.7z")
         << ":/assets/text.7z"
         << true;
+#ifdef Q_OS_WIN
     QTest::newRow("password.7z")
         << ":/assets/password.7z"
         << true;
+#endif
     QTest::newRow("file not exists")
         << "foo"
         << false;
 }
 
+#ifdef Q_OS_WIN
 void TestQt7zPackage::openAndClosePasswordFilename()
 {
     const QString &localPkgPath = extractResource(":/assets/password-filename.7z");
@@ -106,6 +111,7 @@ void TestQt7zPackage::openAndClosePasswordFilename()
     pkg.close();
     QVERIFY(!pkg.isOpen());
 }
+#endif
 
 void TestQt7zPackage::getFileNameList()
 {
@@ -140,6 +146,7 @@ void TestQt7zPackage::getFileNameList_data()
         << ":/assets/text.7z"
         << ""
         << (QStringList() << "1.txt" << "2.txt" << "sub/1.txt");
+#ifdef Q_OS_WIN
     QTest::newRow("password.7z")
         << ":/assets/password.7z"
         << ""
@@ -148,6 +155,7 @@ void TestQt7zPackage::getFileNameList_data()
         << ":/assets/password-filename.7z"
         << "foobar"
         << (QStringList() << "1.txt" << "yellow.png" << "sub" << "sub/1.txt");
+#endif
 }
 
 void TestQt7zPackage::fileInfoList()
@@ -207,6 +215,7 @@ void TestQt7zPackage::fileInfoList_data()
         << (QList<bool>() << false << false << false << true)
         << (QList<bool>() << true << true << true << false)
         << (QList<quint32>() << 2786803049 << 2534262748 << 2534262748 << 0);
+#ifdef Q_OS_WIN
     QTest::newRow("password.7z")
         << ":/assets/password.7z"
         << ""
@@ -223,6 +232,7 @@ void TestQt7zPackage::fileInfoList_data()
         << (QList<bool>() << true << false << false << false)
         << (QList<bool>() << false << true << true << true)
         << (QList<quint32>() << 0 << 2534262748 << 2534262748 << 2786803049);
+#endif
 }
 
 void TestQt7zPackage::extractFile_text()
@@ -267,6 +277,7 @@ void TestQt7zPackage::extractFile_text_data()
         << ""
         << QString("sub/1.txt")
         << QString("I am one.\n");
+#ifdef Q_OS_WIN
     QTest::newRow("password.7z/sub/1.txt")
         << ":/assets/password.7z"
         << "foobar"
@@ -277,6 +288,7 @@ void TestQt7zPackage::extractFile_text_data()
         << "foobar"
         << QString("sub/1.txt")
         << QString("I am one.\n");
+#endif
 }
 
 void TestQt7zPackage::extractFile_image()
@@ -327,6 +339,7 @@ void TestQt7zPackage::extractFile_image_data()
         << QString("[rootnuko＋H] てにおはっ！ ～女の子だってホントはえっちだよ？～/red.jpg")
         << 225
         << 225;
+#ifdef Q_OS_WIN
     QTest::newRow("password.7z/yellow.png")
         << ":/assets/password.7z"
         << "foobar"
@@ -339,6 +352,7 @@ void TestQt7zPackage::extractFile_image_data()
         << QString("yellow.png")
         << 800
         << 800;
+#endif
  }
 
 QTEST_MAIN(TestQt7zPackage)
