@@ -206,7 +206,6 @@ private:
     QStringList m_fileNameList;
     QHash<QString, UInt32> m_fileNameToIndex;
     QList<Qt7zFileInfo> m_fileInfoList;
-    Qt7zPackage::Error m_lastError;
 
     QScopedPointer<CCodecs> m_codecs;
     CArchiveLink m_arcLink;
@@ -215,8 +214,7 @@ private:
 Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q) :
     m_q(q) ,
     m_client(nullptr) ,
-    m_isOpen(false) ,
-    m_lastError(Qt7zPackage::Error::NoError)
+    m_isOpen(false)
 {
     init();
 }
@@ -226,8 +224,7 @@ Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
     m_q(q) ,
     m_packagePath(packagePath) ,
     m_client(nullptr) ,
-    m_isOpen(false) ,
-    m_lastError(Qt7zPackage::Error::NoError)
+    m_isOpen(false)
 {
     init();
 }
@@ -383,7 +380,6 @@ bool Qt7zPackage::open()
     }
 
     m_p->m_isOpen = true;
-    m_p->m_lastError = Qt7zPackage::Error::NoError;
 
     return true;
 }
@@ -418,11 +414,6 @@ QList<Qt7zFileInfo> &Qt7zPackage::fileInfoList() const
 void Qt7zPackage::setClient(Qt7zPackage::Client *client)
 {
     m_p->m_client = client;
-}
-
-Qt7zPackage::Error Qt7zPackage::lastError() const
-{
-    return m_p->m_lastError;
 }
 
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)

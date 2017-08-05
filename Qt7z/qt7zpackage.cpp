@@ -31,10 +31,10 @@ private:
 
     Qt7zPackage *m_q;
     QString m_packagePath;
+    Qt7zPackage::Client *m_client;
     bool m_isOpen;
     QStringList m_fileNameList;
     QList<Qt7zFileInfo> m_fileInfoList;
-    Qt7zPackage::Error m_lastError;
 
     // For 7z
     CFileInStream m_archiveStream;
@@ -50,8 +50,8 @@ private:
 
 Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q) :
     m_q(q) ,
+    m_client(nullptr) ,
     m_isOpen(false) ,
-    m_lastError(Qt7zPackage::Error::NoError) ,
     m_blockIndex(0xFFFFFFFF) ,
     m_outBuffer(0) ,
     m_outBufferSize(0)
@@ -63,8 +63,8 @@ Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
                                        const QString &packagePath) :
     m_q(q) ,
     m_packagePath(packagePath) ,
+    m_client(nullptr) ,
     m_isOpen(false) ,
-    m_lastError(Qt7zPackage::Error::NoError) ,
     m_blockIndex(0xFFFFFFFF) ,
     m_outBuffer(0) ,
     m_outBufferSize(0)
@@ -223,14 +223,9 @@ QList<Qt7zFileInfo> &Qt7zPackage::fileInfoList() const
     return m_p->m_fileInfoList;
 }
 
-void Qt7zPackage::setPassword(const QString &password)
+void Qt7zPackage::setClient(Qt7zPackage::Client *client)
 {
-    qWarning() << "Qt7z: setPassword() not implemented on this platform";
-}
-
-Qt7zPackage::Error Qt7zPackage::lastError() const
-{
-    return m_p->m_lastError;
+    m_p->m_client = client;
 }
 
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)

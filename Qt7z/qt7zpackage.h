@@ -14,10 +14,6 @@ class QT7ZSHARED_EXPORT Qt7zPackage
 {
     friend class Qt7zPackagePrivate;
 public:
-    enum class Error {
-        NoError,
-    };
-
     class Client
     {
     public:
@@ -39,8 +35,6 @@ public:
     QList<Qt7zFileInfo> &fileInfoList() const;
 
     void setClient(Client *client);
-
-    Error lastError() const;
 
     bool extractFile(const QString &name, QIODevice *outStream);
 
