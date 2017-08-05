@@ -27,6 +27,8 @@ private slots:
     void extractFile_text_data();
     void extractFile_image();
     void extractFile_image_data();
+    void extractFile_wrongPassword();
+    void extractFile_wrongPassword_data();
 
 private:
     QString extractResource(const QString &path);
@@ -380,6 +382,34 @@ void TestQt7zPackage::extractFile_image_data()
         << 800;
 #endif
  }
+
+void TestQt7zPackage::extractFile_wrongPassword()
+{
+    QFETCH(QString, rcPkgPath);
+    QFETCH(QString, fileName);
+
+    const QString &localPkgPath = extractResource(rcPkgPath);
+
+    Qt7zPackage pkg(localPkgPath);
+
+    QBuffer buf;
+    buf.open(QIODevice::ReadWrite);
+
+    QVERIFY(!pkg.extractFile(fileName, &buf));
+}
+
+void TestQt7zPackage::extractFile_wrongPassword_data()
+{
+    QTest::addColumn<QString>("rcPkgPath");
+    QTest::addColumn<QString>("fileName");
+
+    QTest::newRow("password.7z")
+        << ":/assets/password.7z"
+        << "1.txt";
+    QTest::newRow("password-filename.7z")
+        << ":/assets/password-filename.7z"
+        << "1.txt";
+}
 
 QTEST_MAIN(TestQt7zPackage)
 #include "Qt7zPackage_Tests.moc"

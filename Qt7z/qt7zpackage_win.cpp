@@ -136,12 +136,24 @@ public:
     INTERFACE_IArchiveExtractCallback(;)
     STDMETHOD(CryptoGetTextPassword)(BSTR *password) override;
 
-    ExtractCallback(Qt7zPackage::Client *client, QIODevice *outStream) :
-        m_client(client), m_outStream(outStream) {}
+    ExtractCallback(Qt7zPackage::Client *client, const Qt7zFileInfo fileInfo, QIODevice *outStream) :
+        m_client(client),
+        m_fileInfo(fileInfo),
+        m_outStream(outStream),
+        m_opRes(NArchive::NExtract::NOperationResult::kOK)
+    {
+    }
+
+    int opRes() const
+    {
+        return m_opRes;
+    }
 
 private:
     Qt7zPackage::Client *m_client;
+    Qt7zFileInfo m_fileInfo;
     QIODevice *m_outStream;
+    int m_opRes;
 };
 
 HRESULT ExtractCallback::SetTotal(UInt64 total)
@@ -173,6 +185,47 @@ HRESULT ExtractCallback::PrepareOperation(Int32 askExtractMode)
 
 HRESULT ExtractCallback::SetOperationResult(Int32 opRes)
 {
+    m_opRes = opRes;
+
+    switch (opRes)
+    {
+      case NArchive::NExtract::NOperationResult::kUnsupportedMethod:
+        qWarning() << "Qt7z: Extract operation result: Unsupported method";
+        break;
+      case NArchive::NExtract::NOperationResult::kCRCError:
+        if (m_fileInfo.isEncrypted) {
+            qWarning() << "Qt7z: Extract operation result: CRC failed in encrypted file. Wrong password?";
+        } else {
+            qWarning() << "Qt7z: Extract operation result: CRC failed";
+        }
+        break;
+      case NArchive::NExtract::NOperationResult::kDataError:
+        if (m_fileInfo.isEncrypted) {
+            qWarning() << "Qt7z: Extract operation result: Data error in encrypted file. Wrong password?";
+        } else {
+            qWarning() << "Qt7z: Extract operation result: Data error";
+        }
+        break;
+      case NArchive::NExtract::NOperationResult::kUnavailable:
+        qWarning() << "Qt7z: Extract operation result: Unavailable data";
+        break;
+      case NArchive::NExtract::NOperationResult::kUnexpectedEnd:
+        qWarning() << "Qt7z: Extract operation result: Unexpected end of data";
+        break;
+      case NArchive::NExtract::NOperationResult::kDataAfterEnd:
+        qWarning() << "Qt7z: Extract operation result: There are some data after the end of the payload data";
+        break;
+      case NArchive::NExtract::NOperationResult::kIsNotArc:
+        qWarning() << "Qt7z: Extract operation result: Is not archive";
+        break;
+      case NArchive::NExtract::NOperationResult::kHeadersError:
+        qWarning() << "Qt7z: Extract operation result: Headers error";
+        break;
+      case NArchive::NExtract::NOperationResult::kWrongPassword:
+        qWarning() << "Qt7z: Extract operation result: Wrong password";
+        break;
+    }
+
     return S_OK;
 }
 
@@ -233,7 +286,7 @@ void Qt7zPackagePrivate::init()
 {
     m_codecs.reset(new CCodecs);
     if (m_codecs->Load() != S_OK) {
-        qDebug() << "Qt7z: Failed to load codecs";
+        qWarning() << "Qt7z: Failed to load codecs";
     }
 }
 
@@ -288,6 +341,11 @@ bool Qt7zPackage::open()
         return false;
     }
 
+    if (!QFile::exists(m_p->m_packagePath)) {
+        qWarning() << "Qt7z: File does not exist:" << m_p->m_packagePath;
+        return false;
+    }
+
     m_p->m_arcLink.NonOpen_ErrorInfo.ClearErrors_Full();
 
     CObjectVector<CProperty> props;
@@ -312,20 +370,18 @@ bool Qt7zPackage::open()
         res = m_p->m_arcLink.Open_Strict(options, &callback);
     }
     catch (...) {
-        qDebug() << "Qt7z: Exception caught when opening archive";
+        qWarning() << "Qt7z: Exception caught when opening archive";
         return false;
     }
 
     if (res != S_OK) {
-        qDebug() << "Qt7z: Fail to open archive with result" << res;
+        qWarning() << "Qt7z: Fail to open archive with result" << res;
         return false;
     }
-
 
     // TODO: Process error info?
     // for (unsigned i = 0; i < arcLink.Size(); i++) {
     //     const CArcErrorInfo &arc = arcLink.Arcs[i].ErrorInfo;
-    //     if ()
     // }
 
     const CArc &arc = m_p->m_arcLink.Arcs.Back();
@@ -333,7 +389,7 @@ bool Qt7zPackage::open()
 
     UInt32 numItems;
     if (archive->GetNumberOfItems(&numItems) != S_OK) {
-        qDebug() << "Qt7z: Fail to get number of items";
+        qWarning() << "Qt7z: Fail to get number of items";
         return false;
     }
 
@@ -343,7 +399,7 @@ bool Qt7zPackage::open()
     for (UInt32 i = 0; i < numItems; i++) {
         UString filePath;
         if (arc.GetItemPath2(i, filePath) != S_OK) {
-            qDebug() << "Qt7z: Fail to get file path of index" << i;
+            qWarning() << "Qt7z: Fail to get file path of index" << i;
             return false;
         }
 
@@ -356,24 +412,29 @@ bool Qt7zPackage::open()
         fileInfo.arcName = m_p->m_packagePath;
 
         if (Archive_IsItem_Dir(archive, i, fileInfo.isDir) != S_OK) {
-            qDebug() << "Qt7z: Fail to determine if directory of index" << i;
+            qWarning() << "Qt7z: Fail to determine if directory of index" << i;
             return false;
         }
 
         CListUInt64Def sizeDef;
         if (GetUInt64Value(archive, i, kpidSize, sizeDef) != S_OK) {
-            qDebug() << "Qt7z: Fail to file size of index" << i;
+            qWarning() << "Qt7z: Fail to file size of index" << i;
             return false;
         }
         fileInfo.size = sizeDef.Val;
 
         CListUInt64Def crcDef;
         if (GetUInt64Value(archive, i, kpidCRC, crcDef) != S_OK) {
-            qDebug() << "Qt7z: Fail to CRC of index" << i;
+            qWarning() << "Qt7z: Fail to CRC of index" << i;
             return false;
         }
         fileInfo.isCrcDefined = crcDef.Def;
         fileInfo.crc = crcDef.Val;
+
+        if (Archive_GetItemBoolProp(archive, i, kpidEncrypted, fileInfo.isEncrypted) != S_OK) {
+            qWarning() << "Qt7z: Fail to determine if encrypted of index" << i;
+            return false;
+        }
 
         m_p->m_fileInfoList << fileInfo;
         m_p->m_fileNameToIndex.insert(fileName, i);
@@ -419,23 +480,24 @@ void Qt7zPackage::setClient(Qt7zPackage::Client *client)
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
 {
     if (!outStream || !outStream->isWritable()) {
-        qDebug() << "Qt7z: Extract output stream is null or not writable!";
+        qWarning() << "Qt7z: Extract output stream is null or not writable!";
         return false;
     }
 
     if (!m_p->m_isOpen) {
         if (!open()) {
-            qDebug() << "Qt7z: Cannot open package for extracting!";
+            qWarning() << "Qt7z: Fail to extract file" << name << "due to unable to open archive" << m_p->m_packagePath;
             return false;
         }
     }
 
     auto indexIt = m_p->m_fileNameToIndex.find(name);
     if (indexIt == m_p->m_fileNameToIndex.end()) {
-        qDebug() << "Qt7z: Fail to find file" << name;
+        qWarning() << "Qt7z: Fail to find file" << name;
         return false;
     }
     UInt32 index = *indexIt;
+    Qt7zFileInfo fileInfo = m_p->m_fileInfoList[index];
 
     const CArc &arc = m_p->m_arcLink.Arcs.Back();
     IInArchive *archive = arc.Archive;
@@ -443,10 +505,17 @@ bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
     realIndices.Add(index);
     Int32 testMode = 0;
 
-    CMyComPtr<ExtractCallback> callback(new ExtractCallback(m_p->m_client, outStream));
+    CMyComPtr<ExtractCallback> callback(new ExtractCallback(m_p->m_client, fileInfo, outStream));
     HRESULT res = archive->Extract(&realIndices.Front(), realIndices.Size(), testMode, callback);
+
     if (res != S_OK) {
-        qDebug() << "Qt7z: Fail to extract file" << name << "with result" << res;
+        qWarning() << "Qt7z: Fail to extract file" << name << "with result" << res;
+        return false;
     }
-    return res == S_OK;
+    if (callback->opRes() != NArchive::NExtract::NOperationResult::kOK) {
+        qWarning() << "Qt7z: Fail to extract file" << name << "with op res" << callback->opRes();
+        return false;
+    }
+
+    return true;
 }

@@ -14,6 +14,7 @@ struct QT7ZSHARED_EXPORT Qt7zFileInfo
     bool isDir;
     bool isCrcDefined;
     quint32 crc;
+    bool isEncrypted;
 };
 
 #endif // QT7ZFILEINFO_H
