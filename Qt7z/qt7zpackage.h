@@ -16,7 +16,13 @@ class QT7ZSHARED_EXPORT Qt7zPackage
 public:
     enum class Error {
         NoError,
-        PasswordRequired,
+    };
+
+    class Client
+    {
+    public:
+        virtual void openPasswordRequired(QString &password) = 0;
+        virtual void extractPasswordRequired(QString &password) = 0;
     };
 
     Qt7zPackage();
@@ -32,7 +38,7 @@ public:
     QStringList fileNameList() const;
     QList<Qt7zFileInfo> &fileInfoList() const;
 
-    void setPassword(const QString &password);
+    void setClient(Client *client);
 
     Error lastError() const;
 

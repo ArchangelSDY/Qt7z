@@ -87,15 +87,15 @@ HRESULT SequentialStreamAdapter::Write(const void *data, UInt32 size, UInt32 *pr
 class OpenCallback : public IOpenCallbackUI, public CMyUnknownImp
 {
 public:
-    OpenCallback(const QString &password) :
-        m_password(password)
+    OpenCallback(Qt7zPackage::Client *client) :
+        m_client(client)
     {
     }
 
     INTERFACE_IOpenCallbackUI(override;)
 
 private:
-    QString m_password;
+    Qt7zPackage::Client *m_client;
 };
 
 HRESULT OpenCallback::Open_CheckBreak()
@@ -120,8 +120,12 @@ HRESULT OpenCallback::Open_Finished()
 
 HRESULT OpenCallback::Open_CryptoGetTextPassword(BSTR *password)
 {
-    std::wstring wpassword = m_password.toStdWString();
-    *password = SysAllocStringLen(wpassword.data(), wpassword.size());
+    if (m_client) {
+        QString requestedPassword;
+        m_client->openPasswordRequired(requestedPassword);
+        std::wstring wpassword = requestedPassword.toStdWString();
+        *password = SysAllocStringLen(wpassword.data(), wpassword.size());
+    }
     return S_OK;
 }
 
@@ -132,12 +136,12 @@ public:
     INTERFACE_IArchiveExtractCallback(;)
     STDMETHOD(CryptoGetTextPassword)(BSTR *password) override;
 
-    ExtractCallback(QIODevice *outStream, const QString &password) :
-        m_outStream(outStream), m_password(password) {}
+    ExtractCallback(Qt7zPackage::Client *client, QIODevice *outStream) :
+        m_client(client), m_outStream(outStream) {}
 
 private:
+    Qt7zPackage::Client *m_client;
     QIODevice *m_outStream;
-    QString m_password;
 };
 
 HRESULT ExtractCallback::SetTotal(UInt64 total)
@@ -174,8 +178,12 @@ HRESULT ExtractCallback::SetOperationResult(Int32 opRes)
 
 HRESULT ExtractCallback::CryptoGetTextPassword(BSTR *password)
 {
-    std::wstring wpassword = m_password.toStdWString();
-    *password = SysAllocStringLen(wpassword.data(), wpassword.size());
+    if (m_client) {
+        QString requestedPassword;
+        m_client->openPasswordRequired(requestedPassword);
+        std::wstring wpassword = requestedPassword.toStdWString();
+        *password = SysAllocStringLen(wpassword.data(), wpassword.size());
+    }
     return S_OK;
 }
 
@@ -193,7 +201,7 @@ private:
 
     Qt7zPackage *m_q;
     QString m_packagePath;
-    QString m_password;
+    Qt7zPackage::Client *m_client;
     bool m_isOpen;
     QStringList m_fileNameList;
     QHash<QString, UInt32> m_fileNameToIndex;
@@ -206,6 +214,7 @@ private:
 
 Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q) :
     m_q(q) ,
+    m_client(nullptr) ,
     m_isOpen(false) ,
     m_lastError(Qt7zPackage::Error::NoError)
 {
@@ -216,6 +225,7 @@ Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
                                        const QString &packagePath) :
     m_q(q) ,
     m_packagePath(packagePath) ,
+    m_client(nullptr) ,
     m_isOpen(false) ,
     m_lastError(Qt7zPackage::Error::NoError)
 {
@@ -298,7 +308,7 @@ bool Qt7zPackage::open()
     std::wstring packagePathW = m_p->m_packagePath.toStdWString();
     options.filePath = UString(packagePathW.data());
 
-    OpenCallback callback(m_p->m_password);
+    OpenCallback callback(m_p->m_client);
 
     HRESULT res;
     try {
@@ -310,10 +320,6 @@ bool Qt7zPackage::open()
     }
 
     if (res != S_OK) {
-        if (m_p->m_arcLink.PasswordWasAsked) {
-            m_p->m_lastError = Qt7zPackage::Error::PasswordRequired;
-        }
-
         qDebug() << "Qt7z: Fail to open archive with result" << res;
         return false;
     }
@@ -409,9 +415,9 @@ QList<Qt7zFileInfo> &Qt7zPackage::fileInfoList() const
     return m_p->m_fileInfoList;
 }
 
-void Qt7zPackage::setPassword(const QString &password)
+void Qt7zPackage::setClient(Qt7zPackage::Client *client)
 {
-    m_p->m_password = password;
+    m_p->m_client = client;
 }
 
 Qt7zPackage::Error Qt7zPackage::lastError() const
@@ -446,7 +452,7 @@ bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
     realIndices.Add(index);
     Int32 testMode = 0;
 
-    CMyComPtr<ExtractCallback> callback(new ExtractCallback(outStream, m_p->m_password));
+    CMyComPtr<ExtractCallback> callback(new ExtractCallback(m_p->m_client, outStream));
     HRESULT res = archive->Extract(&realIndices.Front(), realIndices.Size(), testMode, callback);
     if (res != S_OK) {
         qDebug() << "Qt7z: Fail to extract file" << name << "with result" << res;

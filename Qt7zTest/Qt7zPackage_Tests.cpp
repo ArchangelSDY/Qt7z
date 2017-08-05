@@ -34,6 +34,22 @@ private:
     QTemporaryDir m_tempDir;
 };
 
+class TestQt7zPackageClient : public Qt7zPackage::Client
+{
+public:
+    QString password;
+
+    virtual void openPasswordRequired(QString &requestedPassword) override
+    {
+        requestedPassword = password;
+    }
+
+    virtual void extractPasswordRequired(QString &requestedPassword) override
+    {
+        requestedPassword = password;
+    }
+};
+
 void TestQt7zPackage::initTestCase()
 {
     Q_INIT_RESOURCE(Qt7zTest);
@@ -102,10 +118,12 @@ void TestQt7zPackage::openAndClosePasswordFilename()
     const QString &localPkgPath = extractResource(":/assets/password-filename.7z");
 
     Qt7zPackage pkg(localPkgPath);
-    QVERIFY(!pkg.open());
-    QCOMPARE(pkg.lastError(), Qt7zPackage::Error::PasswordRequired);
+    TestQt7zPackageClient client;
+    pkg.setClient(&client);
 
-    pkg.setPassword("foobar");
+    QVERIFY(!pkg.open());
+
+    client.password = "foobar";
     QVERIFY(pkg.open());
 
     pkg.close();
@@ -122,7 +140,9 @@ void TestQt7zPackage::getFileNameList()
     const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
-    pkg.setPassword(password);
+    TestQt7zPackageClient client;
+    pkg.setClient(&client);
+    client.password = password;
 
     QVERIFY(pkg.open());
 
@@ -171,7 +191,9 @@ void TestQt7zPackage::fileInfoList()
     const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
-    pkg.setPassword(password);
+    TestQt7zPackageClient client;
+    pkg.setClient(&client);
+    client.password = password;
 
     QVERIFY(pkg.open());
 
@@ -245,7 +267,9 @@ void TestQt7zPackage::extractFile_text()
     const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
-    pkg.setPassword(password);
+    TestQt7zPackageClient client;
+    pkg.setClient(&client);
+    client.password = password;
 
     QBuffer buf;
     buf.open(QIODevice::ReadWrite);
@@ -302,7 +326,9 @@ void TestQt7zPackage::extractFile_image()
     const QString &localPkgPath = extractResource(rcPkgPath);
 
     Qt7zPackage pkg(localPkgPath);
-    pkg.setPassword(password);
+    TestQt7zPackageClient client;
+    pkg.setClient(&client);
+    client.password = password;
 
     QBuffer buf;
     buf.open(QIODevice::ReadWrite);
