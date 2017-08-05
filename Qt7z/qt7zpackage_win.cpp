@@ -472,6 +472,11 @@ QList<Qt7zFileInfo> &Qt7zPackage::fileInfoList() const
     return m_p->m_fileInfoList;
 }
 
+Qt7zPackage::Client *Qt7zPackage::client() const
+{
+    return m_p->m_client;
+}
+
 void Qt7zPackage::setClient(Qt7zPackage::Client *client)
 {
     m_p->m_client = client;

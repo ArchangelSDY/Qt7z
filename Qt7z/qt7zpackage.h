@@ -34,6 +34,7 @@ public:
     QStringList fileNameList() const;
     QList<Qt7zFileInfo> &fileInfoList() const;
 
+    Client *client() const;
     void setClient(Client *client);
 
     bool extractFile(const QString &name, QIODevice *outStream);
