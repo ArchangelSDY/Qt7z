@@ -40,5 +40,10 @@ foreach(TEST_FILE ${TEST_FILES})
     add_executable(${TEST_TARGET} ${TEST_FILE} ${TEST_COMMON_SRCS})
     target_link_libraries(${TEST_TARGET} ${TEST_COMMON_LINK_LIBRARIES})
     set_target_properties(${TEST_TARGET} PROPERTIES MACOSX_BUNDLE FALSE)
-    add_test(NAME ${TEST_NAME} COMMAND ${TEST_TARGET} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+    if(UNIX)
+        set(TEST_ARGS -platform offscreen)
+    endif()
+
+    add_test(NAME ${TEST_NAME} COMMAND ${TEST_TARGET} ${TEST_ARGS} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 endforeach(TEST_FILE)
