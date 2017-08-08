@@ -5,6 +5,10 @@ find_package(Qt5Core QUIET)
 find_package(Qt5Test QUIET)
 find_package(Qt5Widgets QUIET)
 
+if(UNIX AND NOT APPLE)
+    find_package(Threads)
+endif()
+
 set(QTCORE_LIBRARIES ${Qt5Core_LIBRARIES})
 # if there is no QT_ROOT, try to deduce it from Qt QtCore include
 if ("${QT_ROOT}" STREQUAL "")
