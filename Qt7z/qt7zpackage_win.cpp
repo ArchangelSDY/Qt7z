@@ -46,6 +46,33 @@ namespace NCrypto {
 
 extern bool g_forceLinkCRC;
 
+struct ForceLinkCodecs
+{
+    ForceLinkCodecs()
+    {
+        bool forceLinkCRC = g_forceLinkCRC;
+
+    #define REFER_TO_FORCE_LINK(NAMESPACE, CODEC) \
+        bool forceLink##NAMESPACE##CODEC = N##NAMESPACE::N##CODEC::g_forceLink;
+
+        REFER_TO_FORCE_LINK(Archive, 7z)
+        REFER_TO_FORCE_LINK(Compress, Bcj)
+        REFER_TO_FORCE_LINK(Compress, Bcj2)
+        REFER_TO_FORCE_LINK(Compress, Branch)
+        REFER_TO_FORCE_LINK(Compress, Copy)
+        REFER_TO_FORCE_LINK(Compress, Lzma)
+        REFER_TO_FORCE_LINK(Compress, Lzma2)
+        REFER_TO_FORCE_LINK(Compress, Ppmd)
+        REFER_TO_FORCE_LINK(Crypto, 7z)
+        REFER_TO_FORCE_LINK(Crypto, Aes)
+    }
+
+};
+
+#ifdef Q_OS_WIN
+__declspec(selectany)ForceLinkCodecs forceLink;
+#endif
+
 struct CListUInt64Def
 {
   UInt64 Val;
@@ -248,7 +275,6 @@ public:
     Qt7zPackagePrivate(Qt7zPackage *q, const QString &packagePath);
 
 private:
-    static void forceLinkCodecs();
     void init();
     void reset();
 
@@ -288,25 +314,6 @@ void Qt7zPackagePrivate::init()
     if (m_codecs->Load() != S_OK) {
         qWarning() << "Qt7z: Failed to load codecs";
     }
-}
-
-void Qt7zPackagePrivate::forceLinkCodecs()
-{
-    bool forceLinkCRC = g_forceLinkCRC;
-
-#define REFER_TO_FORCE_LINK(NAMESPACE, CODEC) \
-    bool forceLink##NAMESPACE##CODEC = N##NAMESPACE::N##CODEC::g_forceLink;
-
-    REFER_TO_FORCE_LINK(Archive, 7z)
-    REFER_TO_FORCE_LINK(Compress, Bcj)
-    REFER_TO_FORCE_LINK(Compress, Bcj2)
-    REFER_TO_FORCE_LINK(Compress, Branch)
-    REFER_TO_FORCE_LINK(Compress, Copy)
-    REFER_TO_FORCE_LINK(Compress, Lzma)
-    REFER_TO_FORCE_LINK(Compress, Lzma2)
-    REFER_TO_FORCE_LINK(Compress, Ppmd)
-    REFER_TO_FORCE_LINK(Crypto, 7z)
-    REFER_TO_FORCE_LINK(Crypto, Aes)
 }
 
 void Qt7zPackagePrivate::reset()
