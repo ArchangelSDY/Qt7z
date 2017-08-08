@@ -1,14 +1,288 @@
 #include "qt7zpackage.h"
 
-#include "7z/7z.h"
-#include "7z/7zAlloc.h"
-#include "7z/7zCrc.h"
-#include "7z/7zFile.h"
-#include "7z/7zVersion.h"
+#include <QDir>
+#include <QScopedPointer>
+
+#ifdef Q_OS_WIN
+#include "7zip/CPP/Common/MyWindows.h"
+#include "7zip/CPP/Common/MyCom.h"
+#include "7zip/CPP/Common/MyInitGuid.h"
+#include "7zip/CPP/7zip/Bundles/Alone7z/StdAfx.h"
+#include "7zip/CPP/7zip/Common/RegisterArc.h"
+#include "7zip/CPP/7zip/Common/RegisterCodec.h"
+#include "7zip/CPP/7zip/UI/Common/OpenArchive.h"
+#include "7zip/CPP/7zip/UI/Common/Extract.h"
+#include "7zip/CPP/Windows/PropVariantConv.h"
+#else
+#include "p7zip/CPP/include_windows/windows.h"
+#include "p7zip/CPP/include_windows/basetyps.h"
+#include "p7zip/CPP/include_windows/tchar.h"
+#include "p7zip/CPP/myWindows/StdAfx.h"
+#include "p7zip/CPP/Common/MyWindows.h"
+#include "p7zip/CPP/Common/MyCom.h"
+#include "p7zip/CPP/Common/MyInitGuid.h"
+#include "p7zip/CPP/7zip/Common/RegisterArc.h"
+#include "p7zip/CPP/7zip/Common/RegisterCodec.h"
+#include "p7zip/CPP/7zip/UI/Common/OpenArchive.h"
+#include "p7zip/CPP/7zip/UI/Common/Extract.h"
+#include "p7zip/CPP/Windows/PropVariantConv.h"
+#endif
 
 #include "qt7zfileinfo.h"
 
 #include <QDebug>
+
+using namespace NWindows;
+using namespace NFile;
+
+#define NAMESPACE_FORCE_LINK(CODEC) \
+    namespace N##CODEC { \
+        extern bool g_forceLink; \
+    }
+
+namespace NArchive {
+    NAMESPACE_FORCE_LINK(7z)
+}
+
+namespace NCompress {
+    NAMESPACE_FORCE_LINK(Bcj)
+    NAMESPACE_FORCE_LINK(Bcj2)
+    NAMESPACE_FORCE_LINK(Branch)
+    NAMESPACE_FORCE_LINK(Copy)
+    NAMESPACE_FORCE_LINK(Lzma)
+    NAMESPACE_FORCE_LINK(Lzma2)
+    NAMESPACE_FORCE_LINK(Ppmd)
+}
+
+namespace NCrypto {
+    NAMESPACE_FORCE_LINK(7z)
+    NAMESPACE_FORCE_LINK(Aes)
+}
+
+extern bool g_forceLinkCRC;
+
+struct ForceLinkCodecs
+{
+    ForceLinkCodecs()
+    {
+        bool forceLinkCRC = g_forceLinkCRC;
+
+    #define REFER_TO_FORCE_LINK(NAMESPACE, CODEC) \
+        bool forceLink##NAMESPACE##CODEC = N##NAMESPACE::N##CODEC::g_forceLink;
+
+        REFER_TO_FORCE_LINK(Archive, 7z)
+        REFER_TO_FORCE_LINK(Compress, Bcj)
+        REFER_TO_FORCE_LINK(Compress, Bcj2)
+        REFER_TO_FORCE_LINK(Compress, Branch)
+        REFER_TO_FORCE_LINK(Compress, Copy)
+        REFER_TO_FORCE_LINK(Compress, Lzma)
+        REFER_TO_FORCE_LINK(Compress, Lzma2)
+        REFER_TO_FORCE_LINK(Compress, Ppmd)
+        REFER_TO_FORCE_LINK(Crypto, 7z)
+        REFER_TO_FORCE_LINK(Crypto, Aes)
+    }
+
+};
+
+#ifdef Q_OS_WIN
+__declspec(selectany)ForceLinkCodecs forceLink;
+#else
+ForceLinkCodecs forceLink;
+#endif
+
+struct CListUInt64Def
+{
+  UInt64 Val;
+  bool Def;
+
+  CListUInt64Def(): Val(0), Def(false) {}
+  void Add(UInt64 v) { Val += v; Def = true; }
+  void Add(const CListUInt64Def &v) { if (v.Def) Add(v.Val); }
+};
+
+static HRESULT GetUInt64Value(IInArchive *archive, UInt32 index, PROPID propID, CListUInt64Def &value)
+{
+  value.Val = 0;
+  value.Def = false;
+  NWindows::NCOM::CPropVariant prop;
+  RINOK(archive->GetProperty(index, propID, &prop));
+  value.Def = ConvertPropVariantToUInt64(prop, value.Val);
+  return S_OK;
+}
+
+class SequentialStreamAdapter : public ISequentialOutStream, public CMyUnknownImp
+{
+public:
+    MY_UNKNOWN_IMP1(ISequentialOutStream)
+    STDMETHOD(Write)(const void *data, UInt32 size, UInt32 *processedSize);
+
+    SequentialStreamAdapter(QIODevice *device) : CMyUnknownImp(), m_device(device) {}
+
+private:
+    QIODevice *m_device;
+};
+
+HRESULT SequentialStreamAdapter::Write(const void *data, UInt32 size, UInt32 *processedSize)
+{
+    *processedSize = m_device->write(reinterpret_cast<const char *>(data), size);
+    return S_OK;
+}
+
+class OpenCallback : public IOpenCallbackUI, public CMyUnknownImp
+{
+public:
+    OpenCallback(Qt7zPackage::Client *client) :
+        m_client(client)
+    {
+    }
+
+    INTERFACE_IOpenCallbackUI(override;)
+
+private:
+    Qt7zPackage::Client *m_client;
+};
+
+HRESULT OpenCallback::Open_CheckBreak()
+{
+    return S_OK;
+}
+
+HRESULT OpenCallback::Open_SetTotal(const UInt64 *files, const UInt64 *bytes)
+{
+    return S_OK;
+}
+
+HRESULT OpenCallback::Open_SetCompleted(const UInt64 *files, const UInt64 *bytes)
+{
+    return S_OK;
+}
+
+HRESULT OpenCallback::Open_Finished()
+{
+    return S_OK;
+}
+
+HRESULT OpenCallback::Open_CryptoGetTextPassword(BSTR *password)
+{
+    if (m_client) {
+        QString requestedPassword;
+        m_client->openPasswordRequired(requestedPassword);
+        std::wstring wpassword = requestedPassword.toStdWString();
+        *password = SysAllocStringLen(wpassword.data(), wpassword.size());
+    }
+    return S_OK;
+}
+
+class ExtractCallback : public IArchiveExtractCallback, public ICryptoGetTextPassword, public CMyUnknownImp
+{
+public:
+    MY_UNKNOWN_IMP2(IArchiveExtractCallback, ICryptoGetTextPassword)
+    INTERFACE_IArchiveExtractCallback(;)
+    STDMETHOD(CryptoGetTextPassword)(BSTR *password) override;
+
+    ExtractCallback(Qt7zPackage::Client *client, const Qt7zFileInfo fileInfo, QIODevice *outStream) :
+        m_client(client),
+        m_fileInfo(fileInfo),
+        m_outStream(outStream),
+        m_opRes(NArchive::NExtract::NOperationResult::kOK)
+    {
+    }
+
+    int opRes() const
+    {
+        return m_opRes;
+    }
+
+private:
+    Qt7zPackage::Client *m_client;
+    Qt7zFileInfo m_fileInfo;
+    QIODevice *m_outStream;
+    int m_opRes;
+};
+
+HRESULT ExtractCallback::SetTotal(UInt64 total)
+{
+    return S_OK;
+}
+
+HRESULT ExtractCallback::SetCompleted(const UInt64 *completeValue)
+{
+    return S_OK;
+}
+
+HRESULT ExtractCallback::GetStream(UInt32 index, ISequentialOutStream **outStream, Int32 askExtractMode)
+{
+    if (askExtractMode != NArchive::NExtract::NAskMode::kExtract) {
+        *outStream = nullptr;
+        return S_OK;
+    }
+
+    CMyComPtr<ISequentialOutStream> stream(new SequentialStreamAdapter(m_outStream));
+    *outStream = stream.Detach();
+    return S_OK;
+}
+
+HRESULT ExtractCallback::PrepareOperation(Int32 askExtractMode)
+{
+    return S_OK;
+}
+
+HRESULT ExtractCallback::SetOperationResult(Int32 opRes)
+{
+    m_opRes = opRes;
+
+    switch (opRes)
+    {
+      case NArchive::NExtract::NOperationResult::kUnsupportedMethod:
+        qWarning() << "Qt7z: Extract operation result: Unsupported method";
+        break;
+      case NArchive::NExtract::NOperationResult::kCRCError:
+        if (m_fileInfo.isEncrypted) {
+            qWarning() << "Qt7z: Extract operation result: CRC failed in encrypted file. Wrong password?";
+        } else {
+            qWarning() << "Qt7z: Extract operation result: CRC failed";
+        }
+        break;
+      case NArchive::NExtract::NOperationResult::kDataError:
+        if (m_fileInfo.isEncrypted) {
+            qWarning() << "Qt7z: Extract operation result: Data error in encrypted file. Wrong password?";
+        } else {
+            qWarning() << "Qt7z: Extract operation result: Data error";
+        }
+        break;
+      case NArchive::NExtract::NOperationResult::kUnavailable:
+        qWarning() << "Qt7z: Extract operation result: Unavailable data";
+        break;
+      case NArchive::NExtract::NOperationResult::kUnexpectedEnd:
+        qWarning() << "Qt7z: Extract operation result: Unexpected end of data";
+        break;
+      case NArchive::NExtract::NOperationResult::kDataAfterEnd:
+        qWarning() << "Qt7z: Extract operation result: There are some data after the end of the payload data";
+        break;
+      case NArchive::NExtract::NOperationResult::kIsNotArc:
+        qWarning() << "Qt7z: Extract operation result: Is not archive";
+        break;
+      case NArchive::NExtract::NOperationResult::kHeadersError:
+        qWarning() << "Qt7z: Extract operation result: Headers error";
+        break;
+      case NArchive::NExtract::NOperationResult::kWrongPassword:
+        qWarning() << "Qt7z: Extract operation result: Wrong password";
+        break;
+    }
+
+    return S_OK;
+}
+
+HRESULT ExtractCallback::CryptoGetTextPassword(BSTR *password)
+{
+    if (m_client) {
+        QString requestedPassword;
+        m_client->openPasswordRequired(requestedPassword);
+        std::wstring wpassword = requestedPassword.toStdWString();
+        *password = SysAllocStringLen(wpassword.data(), wpassword.size());
+    }
+    return S_OK;
+}
 
 class Qt7zPackagePrivate
 {
@@ -17,16 +291,8 @@ public:
     Qt7zPackagePrivate(Qt7zPackage *q);
     Qt7zPackagePrivate(Qt7zPackage *q, const QString &packagePath);
 
-    ~Qt7zPackagePrivate()
-    {
-        if (m_outBuffer) {
-            IAlloc_Free(&m_allocImp, m_outBuffer);
-            m_outBuffer = 0;
-        }
-    }
-
 private:
-    void initCallbacks();
+    void init();
     void reset();
 
     Qt7zPackage *m_q;
@@ -34,29 +300,19 @@ private:
     Qt7zPackage::Client *m_client;
     bool m_isOpen;
     QStringList m_fileNameList;
+    QHash<QString, UInt32> m_fileNameToIndex;
     QList<Qt7zFileInfo> m_fileInfoList;
 
-    // For 7z
-    CFileInStream m_archiveStream;
-    CLookToRead m_lookStream;
-    CSzArEx m_db;
-    ISzAlloc m_allocImp;
-    ISzAlloc m_allocTempImp;
-
-    UInt32 m_blockIndex;
-    Byte *m_outBuffer;
-    size_t m_outBufferSize;
+    QScopedPointer<CCodecs> m_codecs;
+    CArchiveLink m_arcLink;
 };
 
 Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q) :
     m_q(q) ,
     m_client(nullptr) ,
-    m_isOpen(false) ,
-    m_blockIndex(0xFFFFFFFF) ,
-    m_outBuffer(0) ,
-    m_outBufferSize(0)
+    m_isOpen(false)
 {
-    initCallbacks();
+    init();
 }
 
 Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
@@ -64,21 +320,17 @@ Qt7zPackagePrivate::Qt7zPackagePrivate(Qt7zPackage *q,
     m_q(q) ,
     m_packagePath(packagePath) ,
     m_client(nullptr) ,
-    m_isOpen(false) ,
-    m_blockIndex(0xFFFFFFFF) ,
-    m_outBuffer(0) ,
-    m_outBufferSize(0)
+    m_isOpen(false)
 {
-    initCallbacks();
+    init();
 }
 
-void Qt7zPackagePrivate::initCallbacks()
+void Qt7zPackagePrivate::init()
 {
-    m_allocImp.Alloc = SzAlloc;
-    m_allocImp.Free = SzFree;
-
-    m_allocTempImp.Alloc = SzAllocTemp;
-    m_allocTempImp.Free = SzFreeTemp;
+    m_codecs.reset(new CCodecs);
+    if (m_codecs->Load() != S_OK) {
+        qWarning() << "Qt7z: Failed to load codecs";
+    }
 }
 
 void Qt7zPackagePrivate::reset()
@@ -87,14 +339,7 @@ void Qt7zPackagePrivate::reset()
     m_isOpen = false;
     m_fileNameList.clear();
     m_fileInfoList.clear();
-
-    m_blockIndex = 0xFFFFFFFF;
-    if (m_outBuffer) {
-        IAlloc_Free(&m_allocImp, m_outBuffer);
-        m_outBufferSize = 0;
-    }
 }
-
 
 Qt7zPackage::Qt7zPackage() :
     m_p(new Qt7zPackagePrivate(this))
@@ -120,85 +365,117 @@ bool Qt7zPackage::open()
         return false;
     }
 
-    SRes res;
-    UInt16 *temp = NULL;
-    size_t tempSize = 0;
+    if (!QFile::exists(m_p->m_packagePath)) {
+        qWarning() << "Qt7z: File does not exist:" << m_p->m_packagePath;
+        return false;
+    }
 
-#ifdef Q_OS_WIN
+    m_p->m_arcLink.NonOpen_ErrorInfo.ClearErrors_Full();
+
+    CObjectVector<CProperty> props;
+    CObjectVector<COpenType> types;   // TODO: ok to leave blank?
+    CIntVector excludedFormats;
+
+    COpenOptions options;
+    options.props = &props;
+    options.codecs = m_p->m_codecs.data();
+    options.types = &types;
+    options.excludedFormats = &excludedFormats;
+    options.stdInMode = false;
+    options.stream = nullptr;
+
     std::wstring packagePathW = m_p->m_packagePath.toStdWString();
-    if (InFile_OpenW(&(m_p->m_archiveStream.file), packagePathW.data())) {
+    options.filePath = UString(packagePathW.data());
+
+    OpenCallback callback(m_p->m_client);
+
+    HRESULT res;
+    try {
+#ifdef Q_OS_WIN
+        res = m_p->m_arcLink.Open_Strict(options, &callback);
 #else
-    if (InFile_Open(&(m_p->m_archiveStream.file),
-                    m_p->m_packagePath.toUtf8().data())) {
+        res = m_p->m_arcLink.Open3(options, &callback);
 #endif
-        qDebug() << "Can not open file: " << m_p->m_packagePath;
-        m_p->m_isOpen = false;
+    }
+    catch (...) {
+        qWarning() << "Qt7z: Exception caught when opening archive";
         return false;
     }
 
-    FileInStream_CreateVTable(&(m_p->m_archiveStream));
-    LookToRead_CreateVTable(&(m_p->m_lookStream), False);
+    if (res != S_OK) {
+        qWarning() << "Qt7z: Fail to open archive with result" << res;
+        return false;
+    }
 
-    m_p->m_lookStream.realStream = &(m_p->m_archiveStream.s);
-    LookToRead_Init(&(m_p->m_lookStream));
+    // TODO: Process error info?
+    // for (unsigned i = 0; i < arcLink.Size(); i++) {
+    //     const CArcErrorInfo &arc = arcLink.Arcs[i].ErrorInfo;
+    // }
 
-    CrcGenerateTable();
+    const CArc &arc = m_p->m_arcLink.Arcs.Back();
+    IInArchive *archive = arc.Archive;
 
-    SzArEx_Init(&(m_p->m_db));
-    res = SzArEx_Open(&(m_p->m_db), &(m_p->m_lookStream.s),
-                      &(m_p->m_allocImp), &(m_p->m_allocTempImp));
+    UInt32 numItems;
+    if (archive->GetNumberOfItems(&numItems) != S_OK) {
+        qWarning() << "Qt7z: Fail to get number of items";
+        return false;
+    }
 
-    if (res == SZ_OK) {
-        for (UInt32 i = 0; i < m_p->m_db.db.NumFiles; i++) {
-            size_t len = SzArEx_GetFileNameUtf16(&(m_p->m_db), i, NULL);
+    CReadArcItem item;
+    UStringVector pathParts;
 
-            if (len > tempSize) {
-                SzFree(NULL, temp);
-                tempSize = len;
-                temp = (UInt16 *)SzAlloc(NULL, tempSize * sizeof(temp[0]));
-                if (temp == 0) {
-                    res = SZ_ERROR_MEM;
-                    break;
-                }
-            }
-
-            SzArEx_GetFileNameUtf16(&(m_p->m_db), i, temp);
-
-            // TODO: Codec?
-            QString fileName = QString::fromUtf16(temp);
-            m_p->m_fileNameList << fileName;
-
-            const CSzFileItem &fileItem = m_p->m_db.db.Files[i];
-            Qt7zFileInfo fileInfo;
-            fileInfo.fileName = fileName;
-            fileInfo.arcName = m_p->m_packagePath;
-            fileInfo.size = fileItem.Size;
-            fileInfo.isDir = fileItem.IsDir;
-            fileInfo.isCrcDefined = fileItem.CrcDefined;
-            fileInfo.crc = fileItem.Crc;
-            m_p->m_fileInfoList << fileInfo;
-
-            if (res != SZ_OK)
-                break;
+    for (UInt32 i = 0; i < numItems; i++) {
+        UString filePath;
+        if (arc.GetItemPath2(i, filePath) != S_OK) {
+            qWarning() << "Qt7z: Fail to get file path of index" << i;
+            return false;
         }
+
+        QString fileName = QDir::fromNativeSeparators(
+            QString::fromWCharArray(filePath.Ptr(), filePath.Len()));
+        m_p->m_fileNameList << fileName;
+
+        Qt7zFileInfo fileInfo;
+        fileInfo.fileName = fileName;
+        fileInfo.arcName = m_p->m_packagePath;
+
+        if (Archive_IsItem_Dir(archive, i, fileInfo.isDir) != S_OK) {
+            qWarning() << "Qt7z: Fail to determine if directory of index" << i;
+            return false;
+        }
+
+        CListUInt64Def sizeDef;
+        if (GetUInt64Value(archive, i, kpidSize, sizeDef) != S_OK) {
+            qWarning() << "Qt7z: Fail to file size of index" << i;
+            return false;
+        }
+        fileInfo.size = sizeDef.Val;
+
+        CListUInt64Def crcDef;
+        if (GetUInt64Value(archive, i, kpidCRC, crcDef) != S_OK) {
+            qWarning() << "Qt7z: Fail to CRC of index" << i;
+            return false;
+        }
+        fileInfo.isCrcDefined = crcDef.Def;
+        fileInfo.crc = crcDef.Val;
+
+        if (Archive_GetItemBoolProp(archive, i, kpidEncrypted, fileInfo.isEncrypted) != S_OK) {
+            qWarning() << "Qt7z: Fail to determine if encrypted of index" << i;
+            return false;
+        }
+
+        m_p->m_fileInfoList << fileInfo;
+        m_p->m_fileNameToIndex.insert(fileName, i);
     }
 
-    SzFree(NULL, temp);
+    m_p->m_isOpen = true;
 
-    if (res == SZ_OK) {
-        m_p->m_isOpen = true;
-        return true;
-    } else {
-        m_p->m_isOpen = false;
-        return false;
-    }
+    return true;
 }
 
 void Qt7zPackage::close()
 {
     if (m_p->m_isOpen) {
-        SzArEx_Free(&(m_p->m_db), &(m_p->m_allocImp));
-        File_Close(&(m_p->m_archiveStream.file));
         m_p->m_isOpen = false;
     }
 }
@@ -236,40 +513,40 @@ void Qt7zPackage::setClient(Qt7zPackage::Client *client)
 bool Qt7zPackage::extractFile(const QString &name, QIODevice *outStream)
 {
     if (!outStream || !outStream->isWritable()) {
-        qDebug() << "Extract output stream is null or not writable!";
+        qWarning() << "Qt7z: Extract output stream is null or not writable!";
         return false;
     }
 
     if (!m_p->m_isOpen) {
         if (!open()) {
-            qDebug() << "Cannot open package for extracting!";
+            qWarning() << "Qt7z: Fail to extract file" << name << "due to unable to open archive" << m_p->m_packagePath;
             return false;
         }
     }
 
-    int index = m_p->m_fileNameList.indexOf(name);
-    if (index == -1) {
-        qDebug() << "Cannot find file: " << name;
+    auto indexIt = m_p->m_fileNameToIndex.find(name);
+    if (indexIt == m_p->m_fileNameToIndex.end()) {
+        qWarning() << "Qt7z: Fail to find file" << name;
         return false;
     }
+    UInt32 index = *indexIt;
+    Qt7zFileInfo fileInfo = m_p->m_fileInfoList[index];
 
-    size_t offset = 0;
-    size_t outSizeProcessed = 0;
+    const CArc &arc = m_p->m_arcLink.Arcs.Back();
+    IInArchive *archive = arc.Archive;
+    CRecordVector<UInt32> realIndices;
+    realIndices.Add(index);
+    Int32 testMode = 0;
 
-    SRes res;
-    res = SzArEx_Extract(&(m_p->m_db), &(m_p->m_lookStream.s), index,
-        &(m_p->m_blockIndex), &(m_p->m_outBuffer), &(m_p->m_outBufferSize),
-        &offset, &outSizeProcessed, &(m_p->m_allocImp), &(m_p->m_allocTempImp));
-    if (res != SZ_OK) {
-        qDebug() << "Fail to extract" << name;
+    CMyComPtr<ExtractCallback> callback(new ExtractCallback(m_p->m_client, fileInfo, outStream));
+    HRESULT res = archive->Extract(&realIndices.Front(), realIndices.Size(), testMode, callback);
+
+    if (res != S_OK) {
+        qWarning() << "Qt7z: Fail to extract file" << name << "with result" << res;
         return false;
     }
-
-    qint64 writtenSize = outStream->write(
-        reinterpret_cast<const char *>(m_p->m_outBuffer + offset),
-        outSizeProcessed);
-    if (static_cast<size_t>(writtenSize) != outSizeProcessed) {
-        qDebug() << "Fail to write all extracted data!";
+    if (callback->opRes() != NArchive::NExtract::NOperationResult::kOK) {
+        qWarning() << "Qt7z: Fail to extract file" << name << "with op res" << callback->opRes();
         return false;
     }
 
