@@ -12,7 +12,7 @@ endif()
 set(QTCORE_LIBRARIES ${Qt5Core_LIBRARIES})
 # if there is no QT_ROOT, try to deduce it from Qt QtCore include
 if ("${QT_ROOT}" STREQUAL "")
-    set(QT_ROOT ${QT_QTCORE_INCLUDE_DIR}/../..)
+    set(QT_ROOT ${Qt5Core_DIR}/../../..)
 endif()
 include_directories(${Qt5Core_INCLUDE_DIRS})
 include_directories(${Qt5Test_INCLUDE_DIRS})

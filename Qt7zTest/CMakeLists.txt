@@ -46,4 +46,7 @@ foreach(TEST_FILE ${TEST_FILES})
     endif()
 
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_TARGET} ${TEST_ARGS} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    if(WIN32)
+        set_property(TEST ${TEST_NAME} PROPERTY ENVIRONMENT "PATH=%PATH%\;${QT_ROOT}\\bin")
+    endif(WIN32)
 endforeach(TEST_FILE)
